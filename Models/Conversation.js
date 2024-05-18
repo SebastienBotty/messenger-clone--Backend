@@ -2,10 +2,11 @@ const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
 const conversationSchema = Schema({
+  isGroupConversation: Boolean,
   members: [{ type: String, require: true }], //Array of usernames
-  admin: [{ type: String, require: TextTrackCue }], //Array of username
+  admin: [{ type: String, require: true }], //Array of username
   messages: [String], // Array of messageId
-  date: {
+  creationDate: {
     type: Date,
     require: true,
   }, //Date of conversation creation

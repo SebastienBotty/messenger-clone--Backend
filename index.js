@@ -10,13 +10,15 @@ const { Server } = require("socket.io");
 require("dotenv").config();
 
 //------------------Express
-// Middleware
+const conversationRouter = require("./Routes/Conversation");
 app.use(express.json({ limit: "50mb" }));
 app.use(
   cors({
     origin: "http://localhost:3001", // Remplacez cela par l'URL de votre frontend
   })
 );
+
+app.use("/api/conversation", conversationRouter);
 
 //------------------Web Socket
 const io = new Server(server, {
