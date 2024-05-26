@@ -7,6 +7,7 @@ const userSchema = Schema({
     unique: true,
     required: true,
   },
+  socketId: String,
   photo: String, //String of image in base64
   conversations: [String], // Array of ConversationId
 });
