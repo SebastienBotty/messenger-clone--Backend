@@ -7,7 +7,7 @@ router.post("/", async (req, res) => {
   const user = new User({
     mail: mail,
     userName: userName,
-    conversation: [],
+    conversations: [],
   });
   try {
     const newUser = await user.save();
@@ -17,6 +17,7 @@ router.post("/", async (req, res) => {
   }
 });
 //-------------------------GET
+// Get all users
 router.get("/", async (req, res) => {
   try {
     const user = await User.find();
@@ -25,7 +26,18 @@ router.get("/", async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 });
-// Verify if the user exists
+
+//GET All user's info base on his email
+router.get("/mail/:mail", async (req, res) => {
+  const mail = req.params.mail;
+  try {
+    const user = await User.findOne({ mail: mail });
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+//GET User to  Verify if the user exists
 router.get("/checkUserName/:userName", async (req, res) => {
   const userName = req.params.userName;
   try {
@@ -41,7 +53,7 @@ router.get("/checkUserName/:userName", async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 });
-// Verify if mail exists
+// GET Mail to verify if mail exists
 router.get("/checkMail/:mail", async (req, res) => {
   const mail = req.params.mail;
   try {
@@ -56,6 +68,17 @@ router.get("/checkMail/:mail", async (req, res) => {
     }
   } catch (error) {
     res.status(400).json({ message: error.message });
+  }
+});
+
+// Get user's conversations based on his user ID
+router.get("/userConversationsId/userId/:userId", async (req, res) => {
+  const userId = req.params.userId;
+  try {
+    const user = await User.find({ _id: userId }, "conversations");
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(400).json({ mesage: error.message });
   }
 });
 //-------------------------PATCH

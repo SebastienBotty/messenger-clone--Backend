@@ -18,6 +18,7 @@ const messageSchema = Schema({
     type: String,
     require: true,
   },
+  conversationId: String,
 });
 
 module.exports = mongoose.model("Messages", messageSchema);
