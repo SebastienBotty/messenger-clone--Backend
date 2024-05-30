@@ -5,13 +5,13 @@ const Conversation = require("../Models/Conversation");
 
 //-------------------------------POST
 router.post("/", async (req, res) => {
-  const { author, text, conversationId } = req.body;
+  const { author, text, date, conversationId } = req.body;
   try {
     const message = new Message({
       author: author,
       text: text,
       seenBy: [author],
-      date: new Date(),
+      date: date,
       conversationId: conversationId,
     });
     const newMessage = await message.save();
@@ -20,7 +20,6 @@ router.post("/", async (req, res) => {
     });
     await conversation.save();
     res.status(201).json(newMessage);
-    console.log(conversation);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
