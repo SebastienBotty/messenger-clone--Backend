@@ -60,7 +60,6 @@ router.get("/checkMail/:mail", async (req, res) => {
     const user = await User.findOne({
       mail: new RegExp("^" + mail + "$", "i"),
     });
-    console.log(user);
     if (user) {
       res.json({ mailExists: true });
     } else {
@@ -82,6 +81,20 @@ router.get("/userConversationsId/userId/:userId", async (req, res) => {
   }
 });
 //-------------------------PATCH
-router.patch("/socketId/:socketId");
+router.patch("/userId/:userId/socketId", async (req, res) => {
+  const userId = req.params.userId;
+  const socketId = req.body.socketId;
+  try {
+    const user = await User.findOne({ _id: userId });
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+    }
+    user.socketId = socketId;
+    await user.save();
+    res.status(200).json(user.socketId);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
 
 module.exports = router;

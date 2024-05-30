@@ -15,8 +15,6 @@ router.post("/", async (req, res) => {
       conversationId: conversationId,
     });
     const newMessage = await message.save();
-    console.log(newMessage._id);
-    console.log(")))))");
     const conversation = await Conversation.findByIdAndUpdate(conversationId, {
       $push: { messages: newMessage._id },
     });

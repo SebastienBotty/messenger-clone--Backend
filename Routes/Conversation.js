@@ -62,7 +62,6 @@ router.get("/conversationId/:conversationId/lastMessage", async (req, res) => {
 
     if (messagesId.messages.length > 0) {
       lastMsgId = messagesId.messages[messagesId.messages.length - 1];
-      console.log(lastMsgId);
 
       const lastMessage = await Message.findById(lastMsgId);
       res.status(200).json(lastMessage);

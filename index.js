@@ -33,9 +33,10 @@ const io = new Server(server, {
 });
 // WebSocket connection
 io.on("connection", (socket) => {
-  console.log("A user connected");
-  socket.on("disconnect", () => {
-    console.log("A user disconnected");
+  console.log(socket.id + " connected");
+
+  socket.on("disconnect", (socket) => {
+    console.log(socket + " disconnected");
   });
 });
 
