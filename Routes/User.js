@@ -27,6 +27,20 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Get all user's info based on username query except conversations field
+router.get("/username?", async (req, res) => {
+  try {
+    const searchQuery = req.query.search;
+    const users = await User.find({
+      userName: { $regex: `.*${searchQuery}.*`, $options: "i" },
+    }).select("-conversations");
+
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
 //GET All user's info base on his email
 router.get("/mail/:mail", async (req, res) => {
   const mail = req.params.mail;
