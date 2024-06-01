@@ -83,4 +83,34 @@ router.get("/conversationId/:conversationId/lastMessage", async (req, res) => {
   }
 });
 
+/*Check if user already have a private conversation with another user 
+Receive a userId,recipient's username. 
+Gets user's conversations field then gets all the conversations within the field
+Check in all conversations if one of them is not a groupConversation and members are just his recipient and him*/
+
+router.get("/privateConversation?", async (req, res, next) => {
+  const username = req.query.username;
+  const recipientUsername = req.query.recipient;
+  try {
+    const user = await User.findOne({
+      userName: new RegExp("^" + username, "i"),
+    });
+    const conversationsId = user.conversations;
+    for (const conversationId of conversationsId) {
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation.isGroupConversation) {
+        if (
+          conversation.members.includes(username) &&
+          conversation.members.includes(recipientUsername)
+        ) {
+          return res.json(conversation);
+        }
+      }
+    }
+    res.json(false);
+  } catch (error) {
+    res.status(400).json({ mesage: error.message });
+  }
+});
+
 module.exports = router;
