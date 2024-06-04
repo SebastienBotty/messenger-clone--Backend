@@ -59,11 +59,11 @@ db.once("open", function () {
   // Placez ici le code qui dépend de la connexion à la base de données
 });
 
-// Exporter la connexion pour l'utiliser dans d'autres parties de l'application si nécessaire
-module.exports = db;
-
 app.get("/", (req, res) => res.send("Hello World!"));
 
 server.listen(PORT, () =>
   console.log(`Example app listening at http://localhost:3000`)
 );
+// Exporter la connexion pour l'utiliser dans d'autres parties de l'application si nécessaire
+
+module.exports = app;
