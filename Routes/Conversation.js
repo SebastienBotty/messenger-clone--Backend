@@ -3,19 +3,33 @@ const router = express.Router();
 const Conversation = require("../Models/Conversation");
 const Message = require("../Models/Message");
 const User = require("../Models/User");
+const { auth, authAdmin } = require("../Middlewares/authentication");
+const checkPostConvBody = require("../Middlewares/Conversation");
 
 //----------------------POST---------------------------
-router.post("/", async (req, res) => {
+router.post("/", auth, checkPostConvBody, async (req, res) => {
   const members = req.body.members;
+  const creationDate = req.body.creationDate;
+  const admin = req.body.admin;
+
+  const user = await User.findOne({ userName: admin }).select("_id");
+  if (!user) {
+    return res.status(400).send("User not found");
+  }
+  if (String(user._id) !== req.user.userId) {
+    return res
+      .status(403)
+      .send("You can't create a conversation for someone else");
+  }
+
   const isGroupConversation = members.length > 2; //If there is more than 2 members when conversatoin is created, it is flagged as a group Conversation. Then the admin is the one who created the conversation
   //const admin = isGroupConversation ? req.body.admin : []; //If there is only 2, there's noe admin
-  const admin = req.body.admin;
   const conversation = new Conversation({
     isGroupConversation: isGroupConversation,
     members: members,
     admin: admin,
     messages: [],
-    creationDate: req.body.creationDate,
+    creationDate: creationDate,
   });
   try {
     const newConversation = await conversation.save();
@@ -23,8 +37,10 @@ router.post("/", async (req, res) => {
       const user = await User.findOne({
         userName: new RegExp("^" + member + "$", "i"),
       });
-      user.conversations.push(newConversation._id);
-      await user.save();
+      if (user) {
+        user.conversations.push(newConversation._id);
+        await user.save();
+      }
     }
 
     res.status(201).json(newConversation);
@@ -34,7 +50,7 @@ router.post("/", async (req, res) => {
 });
 
 //-------------------------GET-------------------------
-router.get("/", async (req, res) => {
+router.get("/", authAdmin, async (req, res) => {
   try {
     const conversation = await Conversation.find();
     res.json(conversation);
