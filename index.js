@@ -64,6 +64,7 @@ app.get("/", (req, res) => res.send("Hello World!"));
 server.listen(PORT, () =>
   console.log(`Example app listening at http://localhost:3000`)
 );
+
 // Exporter la connexion pour l'utiliser dans d'autres parties de l'application si nécessaire
 
 module.exports = app;
