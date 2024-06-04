@@ -1,6 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const User = require("../Models/User");
+const jwt = require("jsonwebtoken");
+const { auth, authAdmin } = require("../Middlewares/authentication");
+require("dotenv").config();
+
 //-------------------------POST
 router.post("/", async (req, res) => {
   const { mail, userName } = req.body;
@@ -18,7 +22,7 @@ router.post("/", async (req, res) => {
 });
 //-------------------------GET
 // Get all users
-router.get("/", async (req, res) => {
+router.get("/", authAdmin, async (req, res) => {
   try {
     const user = await User.find();
     res.status(200).json(user);
@@ -44,9 +48,12 @@ router.get("/username?", async (req, res) => {
 //GET All user's info base on his email
 router.get("/mail/:mail", async (req, res) => {
   const mail = req.params.mail;
+
   try {
     const user = await User.findOne({ mail: mail });
-    res.status(200).json(user);
+    const token = jwt.sign(String(user._id), process.env.JWT_SECRET);
+    console.log(token);
+    res.status(200).json([user, { ApiToken: token }]);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -85,8 +92,12 @@ router.get("/checkMail/:mail", async (req, res) => {
 });
 
 // Get user's conversations based on his user ID
-router.get("/userConversationsId/userId/:userId", async (req, res) => {
+router.get("/userConversationsId/userId/:userId", auth, async (req, res) => {
   const userId = req.params.userId;
+
+  if (req.user.userId !== userId) {
+    return res.status(403).send("Access denied.");
+  }
   try {
     const user = await User.find({ _id: userId }, "conversations");
     res.status(200).json(user);
@@ -95,9 +106,12 @@ router.get("/userConversationsId/userId/:userId", async (req, res) => {
   }
 });
 //-------------------------PATCH
-router.patch("/userId/:userId/socketId", async (req, res) => {
+router.patch("/userId/:userId/socketId", auth, async (req, res) => {
   const userId = req.params.userId;
   const socketId = req.body.socketId;
+  if (req.user.userId !== userId) {
+    return res.status(403).send("Access denied.");
+  }
   try {
     const user = await User.findOne({ _id: userId });
     if (!user) {
