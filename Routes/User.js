@@ -32,7 +32,7 @@ router.get("/", authAdmin, async (req, res) => {
 });
 
 // Get all user's info based on username query except conversations field
-router.get("/username?", async (req, res) => {
+router.get("/username?", auth, async (req, res) => {
   try {
     const searchQuery = req.query.search;
     const users = await User.find({
