@@ -60,10 +60,14 @@ router.get("/", authAdmin, async (req, res) => {
 });
 
 //Get conversations based on an array of conversationId, return all field except messagesId
-router.get("/conversationsId/:conversationsId", async (req, res) => {
-  const ids = req.params.conversationsId;
-  const conversationsIds = ids.split(",").map((id) => id.trim());
+router.get("/userId/:userId/getConversations?", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const ids = req.query.conversationsId;
+  const conversationsIds = ids.split("-").map((id) => id.trim());
 
+  if (req.user.userId !== userId) {
+    return res.status(403).send("Access denied.");
+  }
   try {
     const conversations = await Conversation.find({
       _id: {
@@ -78,35 +82,52 @@ router.get("/conversationsId/:conversationsId", async (req, res) => {
 });
 
 // GET conversation last msg
-router.get("/conversationId/:conversationId/lastMessage", async (req, res) => {
-  const conversationId = req.params.conversationId;
-  let lastMsgId;
-  try {
-    const messagesId = await Conversation.findById(conversationId).select(
-      "messages"
-    );
+router.get(
+  "/userId/:userId/conversation/lastMessage?",
+  auth,
+  async (req, res) => {
+    const userId = req.params.userId;
+    const conversationId = req.query.conversationId;
+    let lastMsgId;
 
-    if (messagesId.messages.length > 0) {
-      lastMsgId = messagesId.messages[messagesId.messages.length - 1];
-
-      const lastMessage = await Message.findById(lastMsgId);
-      res.status(200).json(lastMessage);
-    } else {
-      res.status(404).json({ message: "No message in this conversation" });
+    if (req.user.userId !== userId) {
+      return res.status(403).send("Access denied.");
     }
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+    try {
+      const messagesId = await Conversation.findById(conversationId).select(
+        "messages"
+      );
+
+      if (messagesId.messages.length > 0) {
+        lastMsgId = messagesId.messages[messagesId.messages.length - 1];
+
+        const lastMessage = await Message.findById(lastMsgId);
+        res.status(200).json(lastMessage);
+      } else {
+        res.status(404).json({ message: "No message in this conversation" });
+      }
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
   }
-});
+);
 
 /*Check if user already have a private conversation with another user 
 Receive a userId,recipient's username. 
 Gets user's conversations field then gets all the conversations within the field
 Check in all conversations if one of them is not a groupConversation and members are just his recipient and him*/
 
-router.get("/privateConversation?", async (req, res, next) => {
+router.get("/userId/:userId/privateConversation?", auth, async (req, res) => {
+  const userId = req.params.userId;
   const username = req.query.username;
   const recipientUsername = req.query.recipient;
+  console.log(userId, username, recipientUsername);
+
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .send("Access denied. You're not who you pretend to be.");
+  }
   try {
     const user = await User.findOne({
       userName: new RegExp("^" + username, "i"),
