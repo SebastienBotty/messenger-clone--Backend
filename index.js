@@ -8,7 +8,7 @@ const http = require("http");
 const server = http.createServer(app);
 const { Server } = require("socket.io");
 require("dotenv").config();
-
+const { emitMsgToUsers } = require("./SocketUtils");
 //------------------Express
 const conversationRouter = require("./Routes/Conversation");
 const userRouter = require("./Routes/User");
@@ -34,6 +34,10 @@ const io = new Server(server, {
 // WebSocket connection
 io.on("connection", (socket) => {
   console.log(socket.id + " connected");
+
+  socket.on("message", (data) => {
+    emitMsgToUsers(io, data[0], data[1], data[2]);
+  });
 
   socket.on("disconnect", (socket) => {
     console.log(socket + " disconnected");

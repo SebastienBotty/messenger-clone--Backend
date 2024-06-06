@@ -52,7 +52,6 @@ router.get("/mail/:mail", async (req, res) => {
   try {
     const user = await User.findOne({ mail: mail });
     const token = jwt.sign(String(user._id), process.env.JWT_SECRET);
-    console.log(token);
     res.status(200).json([user, { ApiToken: token }]);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -105,6 +104,25 @@ router.get("/userConversationsId/userId/:userId", auth, async (req, res) => {
     res.status(400).json({ mesage: error.message });
   }
 });
+
+router.get("/getSockets?", auth, async (req, res) => {
+  const usersNameArr = req.query.convMembers.split("-");
+  const usersSockets = await Promise.all(
+    usersNameArr.map(async (userName) => {
+      const user = await User.findOne(
+        { userName: { $regex: `.*${userName}.*`, $options: "i" } },
+        { socketId: 1 }
+      );
+      if (!user) {
+        return null;
+      }
+      return { userName: userName, socketId: user.socketId };
+    })
+  );
+  const filteredUsersSockets = usersSockets.filter((socket) => socket !== null);
+  res.status(200).json(filteredUsersSockets);
+});
+
 //-------------------------PATCH
 router.patch("/userId/:userId/socketId", auth, async (req, res) => {
   const userId = req.params.userId;
