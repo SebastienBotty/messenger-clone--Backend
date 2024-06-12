@@ -8,7 +8,7 @@ const http = require("http");
 const server = http.createServer(app);
 const { Server } = require("socket.io");
 require("dotenv").config();
-const { emitMsgToUsers } = require("./SocketUtils");
+const { emitMsgToUsers, emitTypingToUsers } = require("./SocketUtils");
 //------------------Express
 const conversationRouter = require("./Routes/Conversation");
 const userRouter = require("./Routes/User");
@@ -35,6 +35,10 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log(socket.id + " connected");
 
+  socket.on("typing", (data) => {
+    console.log(data);
+    emitTypingToUsers(io, ...data);
+  });
   socket.on("message", (data) => {
     emitMsgToUsers(io, ...data);
   });

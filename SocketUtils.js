@@ -15,4 +15,21 @@ const emitMsgToUsers = (
   });
 };
 
-module.exports = { emitMsgToUsers };
+const emitTypingToUsers = (
+  io,
+  socketIdArr,
+  isWriting,
+  writingUser,
+  conversation
+) => {
+  socketIdArr.map((socketId) => {
+    io.to(socketId.socketId).emit("typing", [
+      isWriting,
+      writingUser,
+      conversation,
+    ]);
+    console.log("Message envoyé à " + socketId.userName);
+  });
+};
+
+module.exports = { emitMsgToUsers, emitTypingToUsers };
