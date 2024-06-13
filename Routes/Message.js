@@ -4,7 +4,11 @@ const Message = require("../Models/Message");
 const Conversation = require("../Models/Conversation");
 const User = require("../Models/User");
 const { auth, authAdmin } = require("../Middlewares/authentication");
-const { checkPostMsgBody, checkGetMsgBody } = require("../Middlewares/Message");
+const {
+  checkPostMsgBody,
+  checkGetMsgBody,
+  checkPatchMsgBody,
+} = require("../Middlewares/Message");
 
 //-------------------------------POST
 router.post("/", auth, checkPostMsgBody, async (req, res) => {
@@ -78,6 +82,42 @@ router.get(
         .skip(start)
         .limit(limit);
       res.status(200).json(messages);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
+  }
+);
+
+//-------------------------------PATCH
+
+// Patch message, add user to seenBy
+
+router.patch(
+  "/userId/:userId/markMessageAsSeen",
+  auth,
+  checkPatchMsgBody,
+  async (req, res) => {
+    const userId = req.params.userId;
+    const messageId = req.body.messageId;
+    const username = req.body.username;
+
+    if (userId !== req.user.userId) {
+      return res
+        .status(403)
+        .send("Access denied. You're not who you pretend to be.");
+    }
+    try {
+      const message = await Message.findById(messageId);
+      if (!message) {
+        return res.status(404).json({ message: "Message not found" });
+      }
+
+      if (!message.seenBy.includes(username)) {
+        message.seenBy.push(username);
+        await message.save();
+        return res.status(200).json(message);
+      }
+      res.send("Message already seen");
     } catch (error) {
       res.status(400).json({ message: error.message });
     }

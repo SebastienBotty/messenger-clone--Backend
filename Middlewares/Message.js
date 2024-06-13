@@ -45,4 +45,23 @@ const checkGetMsgBody = async (req, res, next) => {
   next();
 };
 
-module.exports = { checkPostMsgBody, checkGetMsgBody };
+const checkPatchMsgBody = async (req, res, next) => {
+  if (!req.body.messageId) {
+    return res
+      .status(400)
+      .json({ message: "messageId is required to patch a message" });
+  }
+  if (!req.body.username) {
+    return res
+      .status(400)
+      .json({ message: "username is required to patch a message" });
+  }
+  if (!req.params.userId) {
+    return res
+      .status(400)
+      .json({ message: "userId is required to patch a message" });
+  }
+  next();
+};
+
+module.exports = { checkPostMsgBody, checkGetMsgBody, checkPatchMsgBody };
