@@ -32,4 +32,11 @@ const emitTypingToUsers = (
   });
 };
 
-module.exports = { emitMsgToUsers, emitTypingToUsers };
+const emitSeenMsgToUsers = (io, socketIdArr, message, conversation) => {
+  socketIdArr.map((socketId) => {
+    io.to(socketId.socketId).emit("seenMessage", [message, conversation]);
+    console.log("Message envoyé à " + socketId.userName);
+  });
+};
+
+module.exports = { emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers };
