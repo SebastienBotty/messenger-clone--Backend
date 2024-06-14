@@ -88,6 +88,27 @@ router.get(
   }
 );
 
+router.get("/userId/:userId/getLastMsgSeenByUser", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const convId = req.query.conversationId;
+  const username = req.query.username;
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .send("Access denied. You're not who you pretend to be.");
+  }
+  try {
+    const lastMessageSeen = await Message.findOne({
+      seenBy: { $in: new RegExp("^" + username + "$", "i") },
+      conversationId: convId,
+    }).sort({
+      date: -1,
+    });
+    res.status(200).json(lastMessageSeen._id);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
 //-------------------------------PATCH
 
 // Patch message, add user to seenBy
