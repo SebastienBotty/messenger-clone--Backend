@@ -104,6 +104,9 @@ router.get("/userId/:userId/getLastMsgSeenByUser", auth, async (req, res) => {
     }).sort({
       date: -1,
     });
+    if (!lastMessageSeen) {
+      return res.send(false);
+    }
     res.status(200).json(lastMessageSeen._id);
   } catch (error) {
     res.status(400).json({ message: error.message });
