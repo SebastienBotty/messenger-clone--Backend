@@ -17,6 +17,7 @@ const {
 const conversationRouter = require("./Routes/Conversation");
 const userRouter = require("./Routes/User");
 const messageRouter = require("./Routes/Message");
+const fileRouter = require("./Routes/File");
 
 app.use(express.json({ limit: "50mb" }));
 app.use(
@@ -28,6 +29,7 @@ app.use(
 app.use("/api/conversation", conversationRouter);
 app.use("/api/user", userRouter);
 app.use("/api/message", messageRouter);
+app.use("/api/file", fileRouter);
 
 //------------------Web Socket
 const io = new Server(server, {
