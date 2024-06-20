@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require("multer");
 const AWS = require("aws-sdk");
 require("dotenv").config();
+const { auth } = require("../Middlewares/authentication");
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -19,6 +20,7 @@ const upload = multer({ storage: storage });
 // Route to receive files from frontend
 router.post(
   "/upload/:conversationId",
+  auth,
   upload.array("files"),
   async (req, res) => {
     const bucketName = process.env.AWS_BUCKET_NAME;
