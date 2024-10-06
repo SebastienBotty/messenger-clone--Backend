@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const User = require("../Models/User");
+const Conversation = require("../Models/Conversation");
 const jwt = require("jsonwebtoken");
 const { auth, authAdmin } = require("../Middlewares/authentication");
 require("dotenv").config();
@@ -105,6 +106,8 @@ router.get("/userConversationsId/userId/:userId", auth, async (req, res) => {
   }
 });
 
+
+//Get user SocketId
 router.get("/getSockets?", auth, async (req, res) => {
   const usersNameArr = req.query.convMembers.split("-");
   const usersSockets = await Promise.all(
@@ -122,6 +125,25 @@ router.get("/getSockets?", auth, async (req, res) => {
   const filteredUsersSockets = usersSockets.filter((socket) => socket !== null);
   res.status(200).json(filteredUsersSockets);
 });
+
+//get 5 latest conversation of a user
+router.get("/userId/:userId/getLatestConversations?", auth, async (req, res) => {
+  const userId = req.params.userId;
+  if (req.user.userId !== userId) {
+    return res.status(403).send("Access denied.");
+  }
+  try {
+    const conversations = await Conversation.find({
+      members: { $in: [userId] },
+    }).select("-messages");
+    res.status(200).json(conversations);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+
+
 
 //-------------------------PATCH
 router.patch("/userId/:userId/socketId", auth, async (req, res) => {
