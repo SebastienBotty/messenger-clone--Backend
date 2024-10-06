@@ -4,6 +4,8 @@ const multer = require("multer");
 const AWS = require("aws-sdk");
 require("dotenv").config();
 const { auth } = require("../Middlewares/authentication");
+const Conversation = require("../Models/Conversation");
+const APIUrl = process.env.API_URL
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -19,7 +21,7 @@ const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
 });
-
+//----------------------------------------------------------POST
 // Route to receive files from frontend
 router.post(
   "/upload/:conversationId",
@@ -57,6 +59,89 @@ router.post(
   }
 );
 
+router.post("/userId/:userId/transferImage", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const sender = req.body.sender
+  const targetConversationId = req.body.targetConversationId;
+  const fileUrl = req.body.fileUrl;
+  const date = req.body.date;
+
+  const userApiToken = req.headers["authorization"]
+
+  const filePath = fileUrl.split("?")[0].split('amazonaws.com/')[1];
+  const conversationIdSource = filePath.split("/")[0]
+
+  console.log("Route appelée")
+
+
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .send("Access denied. You're not who you pretend to be.");
+  }
+  const conversationSource = await Conversation.findById(conversationIdSource).select("members");
+  if (!conversationSource) {
+    console.log('Conversation non trouvée')
+    return res.status(404).json({ message: "Conversation not found" });
+  }
+  if (!conversationSource.members.some(member => new RegExp("^" + sender + "$", "i").test(member))) {
+    console.log('Membre pas dans la convo cible')
+    return res.status(403).json({ message: "You are not a member of the source conversation" });
+  }
+
+  const conversationTarget = await Conversation.findById(targetConversationId).select("members");
+  if (!conversationTarget) {
+    return res.status(404).json({ message: "Conversation not found" });
+  }
+
+  if (!conversationTarget.members.some(member => new RegExp("^" + sender + "$", "i").test(member))) {
+    return res.status(403).json({ message: "You are not a member of the target conversation" });
+  }
+
+  await createFolderInS3IfNotExists(bucketName, targetConversationId);
+
+  const copyImage = await copyImageOnS3(filePath, targetConversationId, date);
+
+  if (!copyImage) {
+    return res.status(500).json({ message: "Failed to copy image" });
+  }
+  const newMessage = {
+    author: sender,
+    authorId: userId,
+    text: "PATHIMAGE/" + copyImage,
+    seenBy: [sender],
+    date: date,
+    conversationId: targetConversationId,
+  };
+
+  try {
+    const response = await fetch(
+      `${APIUrl}/message/`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: userApiToken,
+        },
+        body: JSON.stringify(newMessage),
+      }
+    );
+    if (!response.ok) {
+      console.log("ERROR sending message");
+
+      throw new Error("Failed to create message");
+    }
+    console.log("Image transfered successfully");
+    const data = await response.json();
+    console.log(data);
+    return res.status(200).json(data);
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({ message: error.message });
+  }
+})
+
+//----------------------------------------------------------GET
 // Route pour récupérer des fichiers spécifiques par leurs noms
 router.get(
   "/conversationId/:conversationId/getFiles",
@@ -87,34 +172,16 @@ router.get(
             const mimeType = data.ContentType;
             console.log(data);
             console.log(mimeType);
-
-            if (mimeType.startsWith("image/")) {
-              // For images, return the base64 encoded data
-              const signedImgUrl = s3.getSignedUrl("getObject", {
-                Bucket: bucketName,
-                Key: params.Key,
-              });
-
-              return {
-                fileName,
-                type: "image",
-                previewUrl: signedImgUrl,
-              };
-            } else {
-              // For other files, generate a signed URL for downloading
-              const signedUrl = s3.getSignedUrl("getObject", {
-                Bucket: bucketName,
-                Key: params.Key,
-                //Expires: 15,
-                ResponseContentDisposition: "attachment", // Indique au navigateur de télécharger le fichier plutôt que de l'afficher
-              });
-
-              return {
-                fileName,
-                type: "file",
-                downloadUrl: signedUrl,
-              };
-            }
+            const signedUrl = s3.getSignedUrl("getObject", {
+              Bucket: bucketName,
+              Key: params.Key,
+              ResponseContentDisposition: "attachment", // Indique au navigateur de télécharger le fichier plutôt que de l'afficher
+            });
+            return {
+              fileName,
+              type: mimeType.startsWith("image/") ? "image" : "file",
+              url: signedUrl,
+            };
           } catch (err) {
             console.error(`Error fetching file ${fileName} from S3:`, err);
             return null; // Return null for files that couldn't be fetched
@@ -144,6 +211,169 @@ router.get(
     }
   }
 );
+
+
+router.get("/conversationId/:conversationId/getConversationImages", async (req, res) => {
+
+  const convId = req.params.conversationId;
+  const fileName = req.query.fileName;
+  console.log(convId, fileName)
+
+  let continuationToken = null;
+  let referenceDate = null;
+  let files = []
+  const referenceKey = `${convId}/${fileName}`;
+  const params = {
+    Bucket: bucketName,
+    ContinuationToken: continuationToken,
+    Prefix: convId + '/',
+  };
+  try {
+
+    do {
+      const data = await s3.listObjectsV2(params).promise();
+      if (referenceDate === null) {
+        const referenceObject = data.Contents.find(obj => obj.Key === referenceKey);
+        if (referenceObject) {
+          console.log(referenceObject)
+          referenceDate = referenceObject.LastModified;
+        }
+        if (referenceDate) break;
+
+        continuationToken = data.NextContinuationToken;
+      }
+    } while (continuationToken);
+
+    if (!referenceDate) {
+      throw new Error(`Le fichier de référence ${referenceKey} n'a pas été trouvé dans le bucket.`);
+    }
+    continuationToken = null;
+
+    const olderFiles = await getOlderFiles(continuationToken, referenceDate, referenceKey, convId);
+    const newerFiles = await getNewerFiles(continuationToken, referenceDate, referenceKey, convId);
+    files.push({ Key: convId + '/' + fileName })
+    files.unshift(...olderFiles)
+    files.push(...newerFiles)
+
+    const uniqueArr = files.reduce((acc, current) => {
+      // Vérifie si l'id de l'objet courant n'existe pas déjà dans acc
+
+      if (!acc.some(obj => obj.Key === current.Key)) {
+        acc.push(current);
+      }
+      return acc;
+    }, []);
+    const signedUrls = uniqueArr.map(item => {
+      const signedUrl = s3.getSignedUrl("getObject", {
+        Bucket: bucketName,
+        Key: item.Key,
+        ResponseContentDisposition: "attachment", // Indique au navigateur de télécharger le fichier spéc que de l'afficher
+      });
+      return { fileName: item.Key.split("/")[1], src: signedUrl }
+    })
+    res.status(200).json(signedUrls)
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+})
+
+
+//-------------------------------------------------------------- Functions
+const maxFiles = 5;
+
+const getOlderFiles = async (continuationTkn, referenceDate, referenceKey, convId) => {
+  let continuationToken = continuationTkn;
+  let olderFiles = [];
+
+  const params = {
+    Bucket: bucketName,
+    ContinuationToken: continuationToken,
+    Prefix: convId + '/',
+  };
+
+  do {
+    const data = await s3.listObjectsV2(params).promise();
+
+
+    olderFiles = olderFiles.concat(
+      data.Contents.filter(obj => isImage(obj.Key) && obj.LastModified <= referenceDate && obj.Key !== referenceKey)
+    );
+    olderFiles.sort((a, b) => b.LastModified - a.LastModified);
+
+
+    // On continue jusqu'à trouver au moins 12 fichiers plus vieux ou épuiser tous les fichiers
+    if (olderFiles.length >= maxFiles) {
+      olderFiles = olderFiles.slice(0, maxFiles);
+      break;
+    }
+
+    continuationToken = data.NextContinuationToken;
+  } while (continuationToken);
+  olderFiles.reverse();
+
+  return olderFiles;
+}
+const getNewerFiles = async (continuationTkn, referenceDate, referenceKey, convId) => {
+  let continuationToken = continuationTkn;
+  let newerFiles = [];
+
+  const params = {
+    Bucket: bucketName,
+    ContinuationToken: continuationToken,
+    Prefix: convId + '/',
+  };
+  console.log(referenceKey)
+  do {
+    const data = await s3.listObjectsV2(params).promise();
+
+
+    newerFiles = newerFiles.concat(
+      data.Contents.filter(obj => isImage(obj.Key) && obj.LastModified >= referenceDate && obj.Key !== referenceKey)
+    );
+    newerFiles.sort((a, b) => a.LastModified - b.LastModified);
+
+
+    // On continue jusqu'à trouver au moins 12 fichiers plus vieux ou épuiser tous les fichiers
+    if (newerFiles.length >= maxFiles) {
+      newerFiles = newerFiles.slice(0, maxFiles);
+      break;
+    }
+
+    continuationToken = data.NextContinuationToken;
+  } while (continuationToken);
+
+  return newerFiles;
+}
+function isImage(fileName) {
+  const imageExtensions = [
+    '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif',
+    '.svg', '.webp', '.heif', '.heic', '.ico', '.psd',
+    '.ai', '.eps', '.raw', '.cr2', '.nef', '.orf', '.sr2'
+  ];
+  return imageExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
+}
+
+const copyImageOnS3 = async (imgFilePath, conversationIdTarget, date) => {
+  const fileNameWithTimeStamp = imgFilePath.split("/")[1]
+  const fileNameWithoutTimeStamp = fileNameWithTimeStamp.substring(fileNameWithTimeStamp.indexOf('-') + 1)
+
+  const newTimeStamp = new Date(date).getTime();
+
+  const params = {
+    Bucket: bucketName,
+    CopySource: `/${bucketName}/${imgFilePath}`, // Chemin d'origine
+    Key: `${conversationIdTarget}/${newTimeStamp}-${fileNameWithoutTimeStamp}`, // Chemin cible
+  };
+
+  try {
+    await s3.copyObject(params).promise();
+    console.log("Image copied successfully");
+    return `${conversationIdTarget}:${newTimeStamp}-${fileNameWithoutTimeStamp}`
+  } catch (error) {
+    console.error("Error copying image on S3:", error.message);
+    return false
+  }
+};
 
 // Function to create a folder in S3 if it doesn't already exist
 async function createFolderInS3IfNotExists(bucketName, folderName) {
