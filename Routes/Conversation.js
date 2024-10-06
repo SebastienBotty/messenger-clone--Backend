@@ -49,7 +49,7 @@ router.post("/", auth, checkPostConvBody, async (req, res) => {
   }
 });
 
-//-------------------------GET-------------------------
+//-------------------------GET--------------------------------------------------------------------
 router.get("/", authAdmin, async (req, res) => {
   try {
     const conversation = await Conversation.find();
@@ -149,5 +149,63 @@ router.get("/userId/:userId/privateConversation?", auth, async (req, res) => {
     res.status(400).json({ mesage: error.message });
   }
 });
+
+//Find all conversations that has specific members in it (the user + the recipient)
+
+router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
+  const userId = req.params.userId;
+  const members = req.query.members ? req.query.members.split(',') : [];
+  const user = req.query.user ? req.query.user : '';
+
+  if (!user) {
+    return res.status(400).json({ message: "User query parameter is required and must not be empty." });
+  }
+  if (!members.length) {
+    return res.status(400).json({ message: "Members query parameter is required and must not be empty." });
+  }
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .send("Access denied. You're not who you pretend to be.");
+  }
+
+  const regexMembers = members.map(member => new RegExp("^" + member, "i"));
+  const regexUser = new RegExp("^" + user, "i");
+
+  try {
+    const conversations = await Conversation.find({
+      members: { $all: [...regexMembers, regexUser] },
+    }).select("-messages")
+    console.log("iciXXXXXXXXXXXXXX")
+    let test = []
+    if (conversations) {
+      for (let conversation of conversations) {
+        try {
+          const messagesId = await Conversation.findById(conversation._id).select(
+            "messages"
+          );
+
+          if (messagesId.messages.length > 0) {
+            lastMsgId = messagesId.messages[messagesId.messages.length - 1];
+
+            const lastMessage = await Message.findById(lastMsgId);
+            test.push({ ...conversation.toObject(), lastMessage: lastMessage, photo: "" })
+            //console.log(test)
+          }
+
+        }
+        catch (error) {
+          res.status(400).json({ message: error.message });
+        }
+        //console.log(conversation)
+      }
+    }
+
+    res.status(200).json(test);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+})
+
 
 module.exports = router;
