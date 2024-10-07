@@ -112,6 +112,44 @@ router.get("/userId/:userId/getLastMsgSeenByUser", auth, async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 });
+
+//Get all messages of a conversation containing a given word 
+
+router.get("/userId/:userId/searchMessages", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const convId = req.query.conversation;
+  const word = req.query.word;
+
+  console.log(userId, convId, word);
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .send("Access denied. You're not who you pretend to be.");
+  }
+
+  if (!word) {
+    return res
+      .status(400)
+      .json({ message: "word is required to search for messages" });
+  }
+
+  if (!convId) {
+    return res
+      .status(400)
+      .json({ message: "conversationId is required to search for messages" });
+  }
+
+  try {
+    const messages = await Message.find({
+      conversationId: convId,
+      text: { $regex: new RegExp(word, "i") },
+    });
+    res.status(200).json(messages);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+}
+)
 //-------------------------------PATCH
 
 // Patch message, add user to seenBy
