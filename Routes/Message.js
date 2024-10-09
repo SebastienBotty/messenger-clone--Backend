@@ -150,6 +150,40 @@ router.get("/userId/:userId/searchMessages", auth, async (req, res) => {
   }
 }
 )
+
+//Get messages before and after a selected messages
+
+router.get("/userId/:userId/getMessagesBeforeAndAfter", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const messageId = req.query.messageId;
+  const conversationId = req.query.conversationId;
+  const messages = [[], []];
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .send("Access denied. You're not who you pretend to be.");
+  }
+  try {
+    const messagesBefore = await Message.find({
+      conversationId: conversationId,
+      _id: { $lt: messageId },
+    })
+      .sort({ date: -1 })
+      .limit(10);
+    messages[0] = messagesBefore;
+    const messagesAfter = await Message.find({
+      conversationId: conversationId,
+      _id: { $gt: messageId },
+    })
+      .sort({ date: 1 })
+      .limit(10);
+    messages[1] = messagesAfter;
+    res.status(200).json(messages);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
 //-------------------------------PATCH
 
 // Patch message, add user to seenBy
