@@ -169,8 +169,8 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
       .send("Access denied. You're not who you pretend to be.");
   }
 
-  const regexMembers = members.map(member => new RegExp("^" + member, "i"));
-  const regexUser = new RegExp("^" + user, "i");
+  const regexMembers = members.map(member => new RegExp(member, "i"));
+  const regexUser = new RegExp(user, "i");
 
   try {
     const conversations = await Conversation.find({
