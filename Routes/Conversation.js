@@ -215,6 +215,10 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
 router.patch("/addUser", auth, async (req, res) => {
   const { conversationId, adderUsername, adderUserId, addedUsername, addedUserId } = req.body;
 
+  if (!conversationId || !adderUsername || !adderUserId || !addedUsername || !addedUserId) {
+    return res.status(400).json({ message: "All fields are required" });
+  }
+
   if (req.user.userId !== adderUserId) {
     return res.status(403).send("Access denied.");
   }
@@ -269,10 +273,13 @@ router.patch("/addUser", auth, async (req, res) => {
 
 // Remove a user from a conversation
 router.patch("/removeUser", auth, async (req, res) => {
-  const { conversationId, removerUsername, removerUserId, removedUsername, removedUserId } = req.body;
+  const { conversationId, removerUsername, removerUserId, removedUsername } = req.body;
 
+  if (!conversationId || !removerUsername || !removerUserId || !removedUsername) {
+    return res.status(400).json({ message: "All fields are required" });
+  }
   if (req.user.userId !== removerUserId) {
-    return res.status(403).send("Access denied.");
+    return res.status(403).json({ message: "Access denied." });
   }
 
   const session = await Conversation.startSession();
@@ -280,12 +287,9 @@ router.patch("/removeUser", auth, async (req, res) => {
   try {
     session.startTransaction();
 
-    const user = await User.findById(removedUserId).session(session);
+    const user = await User.findOne({ userName: removedUsername }).session(session);
     if (!user) {
       throw new Error("User not found");
-    }
-    if (user.userName !== removedUsername) {
-      throw new Error("Username/userId does not match");
     }
 
     user.conversations = user.conversations.filter(convId => convId.toString() !== conversationId);
@@ -310,9 +314,69 @@ router.patch("/removeUser", auth, async (req, res) => {
     await conversation.save({ session });
 
     await session.commitTransaction();
+    console.log(conversation)
+    res.status(200).json({ members: conversation.members });
 
-    res.status(200).json({ message: "User removed from conversation" });
+  } catch (error) {
+    await session.abortTransaction();
+    res.status(400).json({ message: error.message });
+  } finally {
+    session.endSession();
+  }
+});
 
+// Leave a conversation
+router.patch("/leaveConversation", auth, async (req, res) => {
+  const { conversationId, username, userId } = req.body;
+  console.log(req.body)
+  if (!conversationId || !username || !userId) {
+    return res.status(400).json({ message: "All fields are required" });
+  }
+
+  if (req.user.userId !== userId) {
+    return res.status(403).send("Access denied.");
+  }
+
+  const session = await Conversation.startSession();
+
+  try {
+    session.startTransaction();
+
+    const user = await User.findById(userId).session(session);
+    if (!user) {
+      throw new Error("User not found");
+    }
+    if (user.userName !== username) {
+      throw new Error("Username/userId does not match");
+    }
+    user.conversations = user.conversations.filter(convId => convId.toString() !== conversationId);
+    await user.save({ session });
+
+
+    const conversation = await Conversation.findById(conversationId).session(session);
+    if (!conversation) {
+      throw new Error("Conversation not found");
+    }
+    if (!conversation.isGroupConversation) {
+      throw new Error("You can't leave a private conversation");
+    }
+
+    if (conversation.admin.includes(username)) {
+      if (conversation.admin.length === 1) {
+        throw new Error("Conversation must have at least one admin");
+      }
+      conversation.admin = conversation.admin.filter(admin => admin !== username);
+    }
+    if (!conversation.members.includes(username)) {
+      throw new Error("User is not in the conversation");
+    }
+    conversation.members = conversation.members.filter(member => member !== username);
+    await conversation.save({ session });
+
+
+    await session.commitTransaction();
+
+    res.status(200).json({ message: "User left conversation" });
   } catch (error) {
     await session.abortTransaction();
     res.status(400).json({ message: error.message });
