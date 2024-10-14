@@ -28,14 +28,14 @@ const emitTypingToUsers = (
       writingUser,
       conversation,
     ]);
-    console.log("Message envoyé à " + socketId.userName);
+    console.log("Message TYPING envoyé à " + socketId.userName);
   });
 };
 
 const emitSeenMsgToUsers = (io, socketIdArr, message, conversation) => {
   socketIdArr.map((socketId) => {
     io.to(socketId.socketId).emit("seenMessage", [message, conversation]);
-    console.log("Message envoyé à " + socketId.userName);
+    console.log("Message  VU envoyé à " + socketId.userName);
   });
 };
 
