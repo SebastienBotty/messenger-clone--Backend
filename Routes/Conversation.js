@@ -208,4 +208,120 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
 })
 
 
+//-------------------------PATCH
+
+// Add a user to a conversation 
+
+router.patch("/addUser", auth, async (req, res) => {
+  const { conversationId, adderUsername, adderUserId, addedUsername, addedUserId } = req.body;
+
+  if (req.user.userId !== adderUserId) {
+    return res.status(403).send("Access denied.");
+  }
+
+  const session = await Conversation.startSession();
+
+  try {
+    session.startTransaction();
+
+    const user = await User.findById(addedUserId).session(session);
+    if (!user) {
+      throw new Error("User not found");
+    }
+    if (user.userName !== addedUsername) {
+      throw new Error("Username/userId does not match");
+    }
+
+    if (!user.conversations.includes(conversationId)) {
+      user.conversations.push(conversationId);
+      await user.save({ session });
+    }
+
+
+    const conversation = await Conversation.findById(conversationId).session(session);
+    if (!conversation) {
+      throw new Error("Conversation not found");
+    }
+    if (!conversation.admin.includes(adderUsername)) {
+      throw new Error("You are not the admin of this conversation");
+    }
+    if (conversation.members.includes(addedUsername)) {
+      throw new Error("User already in the conversation");
+    }
+    if (!conversation.isGroupConversation) {
+      throw new Error("You can't add a user to a private conversation");
+    }
+
+    conversation.members.push(addedUsername);
+    await conversation.save({ session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({ message: "User added to conversation" });
+
+  } catch (error) {
+    await session.abortTransaction();
+    res.status(400).json({ message: error.message });
+  } finally {
+    session.endSession();
+  }
+});
+
+// Remove a user from a conversation
+router.patch("/removeUser", auth, async (req, res) => {
+  const { conversationId, removerUsername, removerUserId, removedUsername, removedUserId } = req.body;
+
+  if (req.user.userId !== removerUserId) {
+    return res.status(403).send("Access denied.");
+  }
+
+  const session = await Conversation.startSession();
+
+  try {
+    session.startTransaction();
+
+    const user = await User.findById(removedUserId).session(session);
+    if (!user) {
+      throw new Error("User not found");
+    }
+    if (user.userName !== removedUsername) {
+      throw new Error("Username/userId does not match");
+    }
+
+    user.conversations = user.conversations.filter(convId => convId.toString() !== conversationId);
+    await user.save({ session });
+
+
+    const conversation = await Conversation.findById(conversationId).session(session);
+    if (!conversation) {
+      throw new Error("Conversation not found");
+    }
+    if (!conversation.admin.includes(removerUsername)) {
+      throw new Error("You are not the admin of this conversation");
+    }
+    if (!conversation.members.includes(removedUsername)) {
+      throw new Error("User is not in the conversation");
+    }
+    if (!conversation.isGroupConversation) {
+      throw new Error("You can't remove a user from a private conversation");
+    }
+
+    conversation.members = conversation.members.filter(member => member !== removedUsername);
+    await conversation.save({ session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({ message: "User removed from conversation" });
+
+  } catch (error) {
+    await session.abortTransaction();
+    res.status(400).json({ message: error.message });
+  } finally {
+    session.endSession();
+  }
+});
+
+
+
+
 module.exports = router;
