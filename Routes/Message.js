@@ -17,7 +17,7 @@ router.post("/", auth, checkPostMsgBody, async (req, res) => {
   if (authorId !== req.user.userId) {
     return res
       .status(403)
-      .send("Access denied. You're not who you pretend to be.");
+      .json({ message: "Access denied. You're not who you pretend to be." });
   }
   const convMembers = await Conversation.findById(conversationId).select(
     "members"
@@ -26,7 +26,7 @@ router.post("/", auth, checkPostMsgBody, async (req, res) => {
   if (!convMembers.members.includes(author)) {
     return res
       .status(403)
-      .send("Access denied. You're not in this conversation.");
+      .json({ message: "Access denied. You're not in this conversation." });
   }
 
   try {
@@ -62,7 +62,7 @@ router.get(
     if (userId !== req.user.userId) {
       return res
         .status(403)
-        .send("Access denied. You're not who you pretend to be.");
+        .json({ message: "Access denied. You're not who you pretend to be." });
     }
 
     const convMembers = await Conversation.findById(conversationId);
@@ -73,7 +73,7 @@ router.get(
     if (!convMembers.members.includes(user.userName)) {
       return res
         .status(403)
-        .send("Access denied. You're not in this conversation.");
+        .json({ message: "Access denied. You're not in this conversation." });
     }
 
     try {
@@ -95,7 +95,7 @@ router.get("/userId/:userId/getLastMsgSeenByUser", auth, async (req, res) => {
   if (userId !== req.user.userId) {
     return res
       .status(403)
-      .send("Access denied. You're not who you pretend to be.");
+      .json({ message: "Access denied. You're not who you pretend to be." });
   }
   try {
     const lastMessageSeen = await Message.findOne({
@@ -124,7 +124,7 @@ router.get("/userId/:userId/searchMessages", auth, async (req, res) => {
   if (userId !== req.user.userId) {
     return res
       .status(403)
-      .send("Access denied. You're not who you pretend to be.");
+      .json({ message: "Access denied. You're not who you pretend to be." });
   }
 
   if (!word) {
@@ -161,7 +161,7 @@ router.get("/userId/:userId/getMessagesBeforeAndAfter", auth, async (req, res) =
   if (userId !== req.user.userId) {
     return res
       .status(403)
-      .send("Access denied. You're not who you pretend to be.");
+      .json({ message: "Access denied. You're not who you pretend to be." });
   }
   try {
     const messagesBefore = await Message.find({
@@ -200,7 +200,7 @@ router.patch(
     if (userId !== req.user.userId) {
       return res
         .status(403)
-        .send("Access denied. You're not who you pretend to be.");
+        .json({ message: "Access denied. You're not who you pretend to be." });
     }
     try {
       const message = await Message.findById(messageId);
@@ -213,7 +213,7 @@ router.patch(
         await message.save();
         return res.status(200).json(message);
       }
-      res.send("Message already seen");
+      res.json({ message: "Message already seen" });
     } catch (error) {
       res.status(400).json({ message: error.message });
     }
