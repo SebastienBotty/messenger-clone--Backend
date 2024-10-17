@@ -50,9 +50,22 @@ router.post("/", auth, checkPostConvBody, async (req, res) => {
 });
 
 //-------------------------GET--------------------------------------------------------------------
+//Get all conversations
 router.get("/", authAdmin, async (req, res) => {
   try {
     const conversation = await Conversation.find();
+    res.json(conversation);
+  } catch (error) {
+    res.status(400).json({ mesage: error.message });
+  }
+});
+
+// Get any conversation based on its ID (admin)
+
+router.get("/:conversationId", authAdmin, async (req, res) => {
+  const conversationId = req.params.conversationId;
+  try {
+    const conversation = await Conversation.findById(conversationId).select('-messages');
     res.json(conversation);
   } catch (error) {
     res.status(400).json({ mesage: error.message });
@@ -212,56 +225,65 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
 
 // Add a user to a conversation 
 
-router.patch("/addUser", auth, async (req, res) => {
-  const { conversationId, adderUsername, adderUserId, addedUsername, addedUserId } = req.body;
+router.patch("/addMembers", auth, async (req, res) => {
+  const { conversationId, adderUsername, adderUserId, addedUsers } = req.body;
+  console.log(req.body)
 
-  if (!conversationId || !adderUsername || !adderUserId || !addedUsername || !addedUserId) {
+
+  if (!conversationId || !adderUsername || !adderUserId || !addedUsers || !addedUsers.length) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
   if (req.user.userId !== adderUserId) {
-    return res.status(403).send("Access denied.");
+    return res.status(403).json({ message: "Access denied." });
   }
 
   const session = await Conversation.startSession();
 
   try {
     session.startTransaction();
+    let conversation
+    for (const addedUser of addedUsers) {
+      const addedUsername = addedUser.userName;
+      const addedUserId = addedUser._id;
 
-    const user = await User.findById(addedUserId).session(session);
-    if (!user) {
-      throw new Error("User not found");
-    }
-    if (user.userName !== addedUsername) {
-      throw new Error("Username/userId does not match");
-    }
+      if (!addedUsername || !addedUserId) {
+        throw new Error("All fields of addedUsers are required");
+      }
 
-    if (!user.conversations.includes(conversationId)) {
-      user.conversations.push(conversationId);
-      await user.save({ session });
-    }
+      const user = await User.findById(addedUserId).session(session);
+      if (!user) {
+        throw new Error(`User not found: ${addedUsername}`);
+      }
+      if (user.userName !== addedUsername) {
+        throw new Error(`Username/userId does not match: ${addedUsername}`);
+      }
 
+      if (!user.conversations.includes(conversationId)) {
+        user.conversations.push(conversationId);
+        await user.save({ session });
+      }
 
-    const conversation = await Conversation.findById(conversationId).session(session);
-    if (!conversation) {
-      throw new Error("Conversation not found");
-    }
-    if (!conversation.admin.includes(adderUsername)) {
-      throw new Error("You are not the admin of this conversation");
-    }
-    if (conversation.members.includes(addedUsername)) {
-      throw new Error("User already in the conversation");
-    }
-    if (!conversation.isGroupConversation) {
-      throw new Error("You can't add a user to a private conversation");
-    }
+      conversation = await Conversation.findById(conversationId).session(session);
+      if (!conversation) {
+        throw new Error("Conversation not found");
+      }
+      if (!conversation.admin.includes(adderUsername)) {
+        throw new Error("You are not the admin of this conversation:");
+      }
+      if (conversation.members.includes(addedUsername)) {
+        throw new Error(`User already in the conversation: ${addedUsername}`);
+      }
+      if (!conversation.isGroupConversation) {
+        throw new Error("You can't add a user to a private conversation");
+      }
 
-    conversation.members.push(addedUsername);
-    await conversation.save({ session });
+      conversation.members.push(addedUsername);
+      await conversation.save({ session });
+    }
 
     await session.commitTransaction();
-
-    res.status(200).json({ message: "User added to conversation" });
+    res.status(200).json({ message: "Users added successfully", members: conversation.members });
 
   } catch (error) {
     await session.abortTransaction();
@@ -270,6 +292,7 @@ router.patch("/addUser", auth, async (req, res) => {
     session.endSession();
   }
 });
+
 
 // Remove a user from a conversation
 router.patch("/removeUser", auth, async (req, res) => {
