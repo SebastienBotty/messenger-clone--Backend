@@ -409,6 +409,41 @@ router.patch("/leaveConversation", auth, async (req, res) => {
 });
 
 
+//set someone admin of a group conversation 
+
+router.patch("/setAdmin", auth, async (req, res) => {
+  const { conversationId, addedUsername, userId, username } = req.body;
+  if (!conversationId || !username || !userId) {
+    return res.status(400).json({ message: "All fields are required" });
+  }
+
+  if (req.user.userId !== userId) {
+    return res.status(403).json({ message: "Access denied." });
+  }
+  try {
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+    if (!conversation.isGroupConversation) {
+      return res.status(400).json({ message: "This is not a group conversation" });
+    }
+
+    if (!conversation.admin.includes(username)) {
+      return res.status(400).json({ message: "You are not an admin of this conversation" });
+    }
+    if (conversation.admin.includes(addedUsername)) {
+      return res.status(400).json({ message: "User is already an admin" });
+    }
+    conversation.admin.push(addedUsername)
+
+    await conversation.save();
+    res.status(200).json(conversation.admin);
+
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+})
 
 
 module.exports = router;
