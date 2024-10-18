@@ -223,7 +223,7 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
 
 //-------------------------PATCH
 
-// Add a user to a conversation 
+//PATCH CONV MEMBERS -  Add a user to a grup onversation 
 
 router.patch("/addMembers", auth, async (req, res) => {
   const { conversationId, adderUsername, adderUserId, addedUsers } = req.body;
@@ -294,7 +294,7 @@ router.patch("/addMembers", auth, async (req, res) => {
 });
 
 
-// Remove a user from a conversation
+//PATCH CONV MEMBERS -  Remove a user from a group conversation
 router.patch("/removeUser", auth, async (req, res) => {
   const { conversationId, removerUsername, removerUserId, removedUsername } = req.body;
 
@@ -326,6 +326,9 @@ router.patch("/removeUser", auth, async (req, res) => {
     if (!conversation.admin.includes(removerUsername)) {
       throw new Error("You are not the admin of this conversation");
     }
+    if (conversation.admin.includes(removedUsername)) {
+      throw new Error("You can't remove an admin of the conversation");
+    }
     if (!conversation.members.includes(removedUsername)) {
       throw new Error("User is not in the conversation");
     }
@@ -338,7 +341,7 @@ router.patch("/removeUser", auth, async (req, res) => {
 
     await session.commitTransaction();
     console.log(conversation)
-    res.status(200).json({ members: conversation.members });
+    res.status(200).json(conversation.members);
 
   } catch (error) {
     await session.abortTransaction();
@@ -348,7 +351,7 @@ router.patch("/removeUser", auth, async (req, res) => {
   }
 });
 
-// Leave a conversation
+// PATCH CONV MEMBERS - Users leaves group conversation
 router.patch("/leaveConversation", auth, async (req, res) => {
   const { conversationId, username, userId } = req.body;
   console.log(req.body)
@@ -409,7 +412,7 @@ router.patch("/leaveConversation", auth, async (req, res) => {
 });
 
 
-//set someone admin of a group conversation 
+//PATCH ADMIN - First admin set someone admin of a group conversation 
 
 router.patch("/setAdmin", auth, async (req, res) => {
   const { conversationId, addedUsername, userId, username } = req.body;
@@ -445,5 +448,45 @@ router.patch("/setAdmin", auth, async (req, res) => {
   }
 })
 
+
+// PATCH ADMIN - Remove someone admin of a group conversation
+router.patch("/removeAdmin", auth, async (req, res) => {
+  const { conversationId, username, removerUserId, removedUsername } = req.body;
+  console.log(req.body)
+  console.log(conversationId, removedUsername, removerUserId, username)
+  if (!conversationId || !removerUserId || !removedUsername || !username) {
+    return res.status(400).json({ message: "All fields are required" });
+  }
+
+  if (req.user.userId !== removerUserId) {
+    return res.status(403).json({ message: "Access denied." });
+  }
+  try {
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+    if (!conversation.isGroupConversation) {
+      return res.status(400).json({ message: "This is not a group conversation" });
+    }
+
+    if (conversation.admin[0] !== username) {
+      return res.status(400).json({ message: "You dont have the permission to remove another admin " });
+    }
+    if (!conversation.admin.includes(removedUsername)) {
+      return res.status(400).json({ message: "User is not an admin of this conversation" });
+    }
+    if (removedUsername === username) {
+      return res.status(400).json({ message: "You cannot remove yourself as an admin" });
+    }
+    conversation.admin = conversation.admin.filter(admin => admin !== removedUsername)
+
+    await conversation.save();
+    res.status(200).json(conversation.admin);
+
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+})
 
 module.exports = router;
