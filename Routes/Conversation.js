@@ -226,11 +226,11 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
 //PATCH CONV MEMBERS -  Add a user to a grup onversation 
 
 router.patch("/addMembers", auth, async (req, res) => {
-  const { conversationId, adderUsername, adderUserId, addedUsers } = req.body;
+  const { conversationId, adderUsername, adderUserId, addedUsers, date } = req.body;
   console.log(req.body)
 
 
-  if (!conversationId || !adderUsername || !adderUserId || !addedUsers || !addedUsers.length) {
+  if (!conversationId || !adderUsername || !adderUserId || !addedUsers || !addedUsers.length || !date) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
@@ -287,7 +287,7 @@ router.patch("/addMembers", auth, async (req, res) => {
       author: "System/" + conversationId,
       text: `${adderUsername}-addUser-${addedUsers.map(user => user.userName).join(",")}`,
       seenBy: [adderUsername],
-      date: new Date(),
+      date: date,
     })
 
     const newMessage = await message.save({ session });
@@ -311,9 +311,9 @@ router.patch("/addMembers", auth, async (req, res) => {
 
 //PATCH CONV MEMBERS -  Remove a user from a group conversation
 router.patch("/removeUser", auth, async (req, res) => {
-  const { conversationId, removerUsername, removerUserId, removedUsername } = req.body;
+  const { conversationId, removerUsername, removerUserId, removedUsername, date } = req.body;
 
-  if (!conversationId || !removerUsername || !removerUserId || !removedUsername) {
+  if (!conversationId || !removerUsername || !removerUserId || !removedUsername || date) {
     return res.status(400).json({ message: "All fields are required" });
   }
   if (req.user.userId !== removerUserId) {
@@ -360,7 +360,7 @@ router.patch("/removeUser", auth, async (req, res) => {
       author: "System/" + conversationId,
       text: `${removerUsername}-removeUser-${removedUsername}`,
       seenBy: [removerUsername],
-      date: new Date(),
+      date: date,
     })
 
     const newMessage = await message.save({ session });
