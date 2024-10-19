@@ -313,7 +313,7 @@ router.patch("/addMembers", auth, async (req, res) => {
 router.patch("/removeUser", auth, async (req, res) => {
   const { conversationId, removerUsername, removerUserId, removedUsername, date } = req.body;
 
-  if (!conversationId || !removerUsername || !removerUserId || !removedUsername || date) {
+  if (!conversationId || !removerUsername || !removerUserId || !removedUsername || !date) {
     return res.status(400).json({ message: "All fields are required" });
   }
   if (req.user.userId !== removerUserId) {
