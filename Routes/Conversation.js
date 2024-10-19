@@ -235,7 +235,7 @@ router.patch("/addMembers", auth, async (req, res) => {
   }
 
   if (req.user.userId !== adderUserId) {
-    return res.status(403).json({ message: "Access denied." });
+    return res.status(401).json({ message: "Access denied." });
   }
 
   const session = await Conversation.startSession();
@@ -282,8 +282,23 @@ router.patch("/addMembers", auth, async (req, res) => {
       await conversation.save({ session });
     }
 
+    const message = new Message({
+      conversationId: conversationId,
+      author: "System/" + conversationId,
+      text: `${adderUsername}-addUser-${addedUsers.map(user => user.userName).join(",")}`,
+      seenBy: [adderUsername],
+      date: new Date(),
+    })
+
+    const newMessage = await message.save({ session });
+
+
     await session.commitTransaction();
-    res.status(200).json({ message: "Users added successfully", members: conversation.members });
+    //console.log("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+    const conversationObj = conversation.toObject();
+    delete conversationObj.messages;
+    //console.log(conversationObj)
+    res.status(200).json({ conversation: conversationObj, message: newMessage });
 
   } catch (error) {
     await session.abortTransaction();
@@ -339,9 +354,24 @@ router.patch("/removeUser", auth, async (req, res) => {
     conversation.members = conversation.members.filter(member => member !== removedUsername);
     await conversation.save({ session });
 
+
+    const message = new Message({
+      conversationId: conversationId,
+      author: "System/" + conversationId,
+      text: `${removerUsername}-removeUser-${removedUsername}`,
+      seenBy: [removerUsername],
+      date: new Date(),
+    })
+
+    const newMessage = await message.save({ session });
+
+
     await session.commitTransaction();
-    console.log(conversation)
-    res.status(200).json(conversation.members);
+    //console.log("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+    const conversationObj = conversation.toObject();
+    delete conversationObj.messages;
+    // console.log(conversationObj)
+    res.status(200).json({ conversation: conversationObj, message: newMessage });
 
   } catch (error) {
     await session.abortTransaction();
