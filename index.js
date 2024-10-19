@@ -12,6 +12,7 @@ const {
   emitMsgToUsers,
   emitTypingToUsers,
   emitSeenMsgToUsers,
+  emitMemberChangeToUsers,
 } = require("./SocketUtils");
 //------------------Express
 const conversationRouter = require("./Routes/Conversation");
@@ -42,16 +43,21 @@ io.on("connection", (socket) => {
   console.log(socket.id + " connected");
 
   socket.on("typing", (data) => {
-    console.log(data);
+    // console.log(data);
     emitTypingToUsers(io, ...data);
   });
   socket.on("message", (data) => {
+
     emitMsgToUsers(io, ...data);
   });
 
   socket.on("seenMessage", (data) => {
     emitSeenMsgToUsers(io, ...data);
   });
+
+  socket.on('membersChange', (data) => {
+    emitMemberChangeToUsers(io, ...data)
+  })
 
   socket.on("disconnect", (socket) => {
     console.log(socket + " disconnected");
