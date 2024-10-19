@@ -48,6 +48,18 @@ router.post("/", auth, checkPostMsgBody, async (req, res) => {
   }
 });
 //-------------------------------GET
+
+//Get all messages of a conversation ADMIN
+router.get("/getAllMessages", authAdmin, async (req, res) => {
+  const convId = req.query.conversationId;
+  console.log(convId)
+  try {
+    const messages = await Message.find({ conversationId: convId }).sort({ date: -1 });
+    res.status(200).json(messages);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
 //Get X messages of a conversation starting at a given Y index
 router.get(
   "/userId/:userId/getMessages",
