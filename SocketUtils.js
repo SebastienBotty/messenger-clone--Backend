@@ -50,4 +50,11 @@ const emitMemberChangeToUsers = (io, socketIdArr, conversation) => {
   });
 }
 
-module.exports = { emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitMemberChangeToUsers };
+const emitAdminChangeToUsers = (io, socketIdArr, adminArrAndConvId,) => {
+  socketIdArr.map((socketId) => {
+    io.to(socketId.socketId).emit("adminChange", { adminArr: adminArrAndConvId[0], conversationId: adminArrAndConvId[1] });
+    console.log("Message ADMIN UPDATE envoyé à " + socketId.userName);
+  });
+}
+
+module.exports = { emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitMemberChangeToUsers, emitAdminChangeToUsers };
