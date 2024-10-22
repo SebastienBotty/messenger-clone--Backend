@@ -367,7 +367,8 @@ router.patch("/removeUser", auth, async (req, res) => {
     })
 
     const newMessage = await message.save({ session });
-
+    conversation.messages.push(newMessage._id);
+    await conversation.save({ session });
 
     await session.commitTransaction();
     //console.log("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
@@ -430,6 +431,8 @@ router.patch("/leaveConversation", auth, async (req, res) => {
     })
 
     const newMessage = await message.save({ session });
+    conversation.messages.push(newMessage._id);
+    await conversation.save({ session });
     const conversationObj = conversation.toObject();
 
     delete conversationObj.messages;
