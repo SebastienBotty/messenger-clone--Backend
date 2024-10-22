@@ -6,6 +6,10 @@ const User = require("../Models/User");
 const { auth, authAdmin } = require("../Middlewares/authentication");
 const checkPostConvBody = require("../Middlewares/Conversation");
 
+const { getIo } = require('../Socket') // Importer le serveur Socket.IO initialisé
+const { emitMembersChangeToUsers, getUsersSocketId, emitMemberChangeToUsers } = require('../SocketUtils');
+
+
 //----------------------POST---------------------------
 router.post("/", auth, checkPostConvBody, async (req, res) => {
   const members = req.body.members;
@@ -383,9 +387,9 @@ router.patch("/removeUser", auth, async (req, res) => {
 
 // PATCH CONV MEMBERS - Users leaves group conversation
 router.patch("/leaveConversation", auth, async (req, res) => {
-  const { conversationId, username, userId } = req.body;
+  const { conversationId, username, userId, date } = req.body;
   console.log(req.body)
-  if (!conversationId || !username || !userId) {
+  if (!conversationId || !username || !userId || !date) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
@@ -397,17 +401,6 @@ router.patch("/leaveConversation", auth, async (req, res) => {
 
   try {
     session.startTransaction();
-
-    const user = await User.findById(userId).session(session);
-    if (!user) {
-      throw new Error("User not found");
-    }
-    if (user.userName !== username) {
-      throw new Error("Username/userId does not match");
-    }
-    user.conversations = user.conversations.filter(convId => convId.toString() !== conversationId);
-    await user.save({ session });
-
 
     const conversation = await Conversation.findById(conversationId).session(session);
     if (!conversation) {
@@ -429,10 +422,28 @@ router.patch("/leaveConversation", auth, async (req, res) => {
     conversation.members = conversation.members.filter(member => member !== username);
     await conversation.save({ session });
 
+    const message = new Message({
+      conversationId: conversationId,
+      author: "System/" + conversationId,
+      text: `${username}-leaveConversation`,
+      seenBy: [],
+      date: date,
+    })
+
+    const newMessage = await message.save({ session });
+    const conversationObj = conversation.toObject();
+
+    delete conversationObj.messages;
+    conversationObj.lastMessage = newMessage
+    const usersTosend = [...conversation.members, username]
+    const socketsIds = await getUsersSocketId(usersTosend);
+    console.log("LAAAALALALALALALALALALALALALA")
+    emitMemberChangeToUsers(getIo(), socketsIds, conversationObj);
 
     await session.commitTransaction();
 
     res.status(200).json({ message: "User left conversation" });
+
   } catch (error) {
     await session.abortTransaction();
     res.status(400).json({ message: error.message });

@@ -6,20 +6,18 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const http = require("http");
 const server = http.createServer(app);
-const { Server } = require("socket.io");
 require("dotenv").config();
-const {
-  emitMsgToUsers,
-  emitTypingToUsers,
-  emitSeenMsgToUsers,
-  emitMemberChangeToUsers,
-  emitAdminChangeToUsers,
-} = require("./SocketUtils");
+
+const { initSocket } = require("./Socket");
+
 //------------------Express
 const conversationRouter = require("./Routes/Conversation");
 const userRouter = require("./Routes/User");
 const messageRouter = require("./Routes/Message");
 const fileRouter = require("./Routes/File");
+
+initSocket(server);
+
 
 app.use(express.json({ limit: "50mb" }));
 app.use(
@@ -33,41 +31,9 @@ app.use("/api/user", userRouter);
 app.use("/api/message", messageRouter);
 app.use("/api/file", fileRouter);
 
-//------------------Web Socket
-const io = new Server(server, {
-  cors: {
-    origin: "http://localhost:3001",
-  },
-});
-// WebSocket connection
-io.on("connection", (socket) => {
-  console.log(socket.id + " connected");
 
-  socket.on("typing", (data) => {
-    // console.log(data);
-    emitTypingToUsers(io, ...data);
-  });
-  socket.on("message", (data) => {
 
-    emitMsgToUsers(io, ...data);
-  });
 
-  socket.on("seenMessage", (data) => {
-    emitSeenMsgToUsers(io, ...data);
-  });
-
-  socket.on('membersChange', (data) => {
-    emitMemberChangeToUsers(io, ...data)
-  })
-
-  socket.on("adminChange", (data) => {
-    emitAdminChangeToUsers(io, ...data)
-  })
-
-  socket.on("disconnect", (socket) => {
-    console.log(socket + " disconnected");
-  });
-});
 
 const PORT = process.env.PORT || 3000;
 const MONGO_URL = process.env.MONGO_URL;
@@ -96,4 +62,4 @@ server.listen(PORT, () =>
 
 // Exporter la connexion pour l'utiliser dans d'autres parties de l'application si nécessaire
 
-module.exports = app;
+module.exports = { app };

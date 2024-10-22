@@ -1,3 +1,7 @@
+
+const User = require("./Models/User");
+
+
 const emitMsgToUsers = (
   io,
   socketIdArr,
@@ -43,10 +47,15 @@ const emitSeenMsgToUsers = (io, socketIdArr, message, conversation) => {
 
 const emitMemberChangeToUsers = (io, socketIdArr, conversation) => {
   console.log('làààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààà')
-  console.log(conversation.lastMessage, conversation)
+  //console.log(conversation.lastMessage, conversation)
+  console.log(io)
+  console.log(socketIdArr)
   socketIdArr.map((socketId) => {
-    io.to(socketId.socketId).emit("membersChange", conversation);
-    console.log("Message MEMBER UPDATE envoyé à " + socketId.userName);
+    if (socketId.socketId) {
+      io.to(socketId.socketId).emit("membersChange", conversation);
+      console.log("Message MEMBER UPDATE envoyé à " + socketId.userName);
+    }
+
   });
 }
 
@@ -57,4 +66,23 @@ const emitAdminChangeToUsers = (io, socketIdArr, adminArrAndConvId,) => {
   });
 }
 
-module.exports = { emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitMemberChangeToUsers, emitAdminChangeToUsers };
+
+
+const getUsersSocketId = async (usersNameArr) => {
+  const usersSockets = await Promise.all(
+    usersNameArr.map(async (userName) => {
+      const user = await User.findOne(
+        { userName: { $regex: `.*${userName}.*`, $options: "i" } },
+        { socketId: 1 }
+      );
+      if (!user) {
+        return null;
+      }
+      return { userName: userName, socketId: user.socketId };
+    })
+  );
+  const filteredUsersSockets = usersSockets.filter((socket) => socket !== null);
+  return filteredUsersSockets
+}
+
+module.exports = { emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitMemberChangeToUsers, emitAdminChangeToUsers, getUsersSocketId };
