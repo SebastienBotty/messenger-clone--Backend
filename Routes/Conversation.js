@@ -259,9 +259,8 @@ router.patch("/addMembers", auth, async (req, res) => {
       author: "System/" + conversationId,
       text: `${adderUsername}-addUser-${addedUsers.map(user => user.userName).join(",")}`,
       seenBy: [adderUsername],
-      date: date,
+      date: new Date(date),
     })
-
     const newMessage = await message.save({ session });
     for (const addedUser of addedUsers) {
       const addedUsername = addedUser.userName;
@@ -363,7 +362,7 @@ router.patch("/removeUser", auth, async (req, res) => {
       author: "System/" + conversationId,
       text: `${removerUsername}-removeUser-${removedUsername}`,
       seenBy: [removerUsername],
-      date: date,
+      date: new Date(date),
     })
 
     const newMessage = await message.save({ session });
@@ -427,7 +426,7 @@ router.patch("/leaveConversation", auth, async (req, res) => {
       author: "System/" + conversationId,
       text: `${username}-leaveConversation`,
       seenBy: [],
-      date: date,
+      date: new Date(date),
     })
 
     const newMessage = await message.save({ session });
