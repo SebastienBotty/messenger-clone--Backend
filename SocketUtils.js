@@ -46,9 +46,6 @@ const emitSeenMsgToUsers = (io, socketIdArr, message, conversation) => {
 };
 
 const emitMemberChangeToUsers = (io, socketIdArr, conversation) => {
-  console.log('làààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààààà')
-  //console.log(conversation.lastMessage, conversation)
-  console.log(io)
   console.log(socketIdArr)
   socketIdArr.map((socketId) => {
     if (socketId.socketId) {
