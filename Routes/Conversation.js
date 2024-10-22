@@ -246,7 +246,23 @@ router.patch("/addMembers", auth, async (req, res) => {
 
   try {
     session.startTransaction();
-    let conversation
+    const conversation = await Conversation.findById(conversationId).session(session);
+    if (!conversation) {
+      throw new Error("Conversation not found");
+    }
+    if (!conversation.isGroupConversation) {
+      throw new Error("You can't add a user to a private conversation");
+    }
+
+    const message = new Message({
+      conversationId: conversationId,
+      author: "System/" + conversationId,
+      text: `${adderUsername}-addUser-${addedUsers.map(user => user.userName).join(",")}`,
+      seenBy: [adderUsername],
+      date: date,
+    })
+
+    const newMessage = await message.save({ session });
     for (const addedUser of addedUsers) {
       const addedUsername = addedUser.userName;
       const addedUserId = addedUser._id;
@@ -268,35 +284,18 @@ router.patch("/addMembers", auth, async (req, res) => {
         await user.save({ session });
       }
 
-      conversation = await Conversation.findById(conversationId).session(session);
-      if (!conversation) {
-        throw new Error("Conversation not found");
-      }
+
       if (!conversation.admin.includes(adderUsername)) {
         throw new Error("You are not the admin of this conversation:");
       }
       if (conversation.members.includes(addedUsername)) {
         throw new Error(`User already in the conversation: ${addedUsername}`);
       }
-      if (!conversation.isGroupConversation) {
-        throw new Error("You can't add a user to a private conversation");
-      }
 
       conversation.members.push(addedUsername);
-      await conversation.save({ session });
     }
-
-    const message = new Message({
-      conversationId: conversationId,
-      author: "System/" + conversationId,
-      text: `${adderUsername}-addUser-${addedUsers.map(user => user.userName).join(",")}`,
-      seenBy: [adderUsername],
-      date: date,
-    })
-
-    const newMessage = await message.save({ session });
-
-
+    conversation.messages.push(newMessage._id);
+    await conversation.save({ session });
     await session.commitTransaction();
     //console.log("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
     const conversationObj = conversation.toObject();
