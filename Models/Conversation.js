@@ -10,6 +10,16 @@ const conversationSchema = Schema({
     type: Date,
     require: true,
   }, //Date of conversation creation
+  removedMembers: [{
+    username: {
+      type: String,
+      require: true
+    },
+    date: {
+      type: Date,
+      require: true
+    }
+  }]
 });
 
 module.exports = mongoose.model("Conversation", conversationSchema);

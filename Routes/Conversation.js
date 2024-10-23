@@ -34,6 +34,7 @@ router.post("/", auth, checkPostConvBody, async (req, res) => {
     admin: admin,
     messages: [],
     creationDate: creationDate,
+    removedMembers: [],
   });
   try {
     const newConversation = await conversation.save();
@@ -291,6 +292,12 @@ router.patch("/addMembers", auth, async (req, res) => {
         throw new Error(`User already in the conversation: ${addedUsername}`);
       }
 
+      if (conversation.removedMembers.some(member => member.username === addedUsername)) {
+        console.log("here")
+        console.log(conversation.removedMembers)
+        conversation.removedMembers = conversation.removedMembers.filter(member => member.username !== addedUsername)
+      }
+
       conversation.members.push(addedUsername);
     }
     conversation.messages.push(newMessage._id);
@@ -299,7 +306,7 @@ router.patch("/addMembers", auth, async (req, res) => {
     //console.log("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
     const conversationObj = conversation.toObject();
     delete conversationObj.messages;
-    //console.log(conversationObj)
+    console.log(conversation.removedMembers)
     res.status(200).json({ conversation: conversationObj, message: newMessage });
 
   } catch (error) {
@@ -327,14 +334,6 @@ router.patch("/removeUser", auth, async (req, res) => {
   try {
     session.startTransaction();
 
-    const user = await User.findOne({ userName: removedUsername }).session(session);
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    user.conversations = user.conversations.filter(convId => convId.toString() !== conversationId);
-    await user.save({ session });
-
 
     const conversation = await Conversation.findById(conversationId).session(session);
     if (!conversation) {
@@ -354,6 +353,7 @@ router.patch("/removeUser", auth, async (req, res) => {
     }
 
     conversation.members = conversation.members.filter(member => member !== removedUsername);
+    conversation.removedMembers.push({ username: removedUsername, date: new Date(date) });
     await conversation.save({ session });
 
 
@@ -419,6 +419,7 @@ router.patch("/leaveConversation", auth, async (req, res) => {
       throw new Error("User is not in the conversation");
     }
     conversation.members = conversation.members.filter(member => member !== username);
+    conversation.removedMembers.push({ username: username, date: new Date(date) });
     await conversation.save({ session });
 
     const message = new Message({
