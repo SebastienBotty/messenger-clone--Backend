@@ -392,12 +392,13 @@ router.patch("/removeUser", auth, async (req, res) => {
     const newMessage = await message.save({ session });
     conversation.messages.push(newMessage._id);
     await conversation.save({ session });
-
-    await session.commitTransaction();
-    //console.log("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
     const conversationObj = conversation.toObject();
     delete conversationObj.messages;
-    // console.log(conversationObj)
+    const usersTosend = [...conversation.members.filter(member => member !== removerUsername), removedUsername] // remove the user who sent the request// !! Read commit message !
+    const socketsIds = await getUsersSocketId(usersTosend);
+    conversationObj.lastMessage = newMessage
+    emitMemberChangeToUsers(getIo(), socketsIds, conversationObj);
+    await session.commitTransaction();
     res.status(200).json({ conversation: conversationObj, message: newMessage });
 
   } catch (error) {
