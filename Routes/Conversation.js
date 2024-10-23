@@ -257,7 +257,6 @@ router.patch("/addMembers", auth, async (req, res) => {
   const { conversationId, adderUsername, adderUserId, addedUsers, date } = req.body;
   console.log(req.body)
 
-
   if (!conversationId || !adderUsername || !adderUserId || !addedUsers || !addedUsers.length || !date) {
     return res.status(400).json({ message: "All fields are required" });
   }
@@ -325,11 +324,13 @@ router.patch("/addMembers", auth, async (req, res) => {
     }
     conversation.messages.push(newMessage._id);
     await conversation.save({ session });
-    await session.commitTransaction();
-    //console.log("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
     const conversationObj = conversation.toObject();
     delete conversationObj.messages;
-    console.log(conversation.removedMembers)
+    const usersTosend = [...conversation.members.filter(member => member !== adderUsername)] // remove the user who sent the request// !! Read commit message !
+    const socketsIds = await getUsersSocketId(usersTosend);
+    conversationObj.lastMessage = newMessage
+    emitMemberChangeToUsers(getIo(), socketsIds, conversationObj);
+    await session.commitTransaction();
     res.status(200).json({ conversation: conversationObj, message: newMessage });
 
   } catch (error) {
