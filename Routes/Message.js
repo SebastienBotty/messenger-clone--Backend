@@ -169,6 +169,34 @@ router.get("/userId/:userId/searchMessages", auth, async (req, res) => {
   }
 
   try {
+    const user = await User.findById(userId).select("userName");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const conversation = await Conversation.findById(convId);
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    if (!conversation.members.includes(user.userName) && !conversation.removedMembers.some(member => member.username === user.userName)) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. You're not in this conversation." });
+    }
+
+    if (conversation.removedMembers.some(member => member.username === user.userName)) {
+      const messages = await Message.find({
+        conversationId: convId,
+        text: { $regex: new RegExp(word, "i") },
+        author: { $ne: "System/" + convId },
+        date: { $lte: conversation.removedMembers.find(member => member.username === user.userName).date },
+      });
+      return res.status(200).json(messages);
+    }
+
+
+
     const messages = await Message.find({
       conversationId: convId,
       text: { $regex: new RegExp(word, "i") },
