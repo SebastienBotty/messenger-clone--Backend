@@ -112,12 +112,35 @@ router.get(
       return res.status(403).send("Access denied.");
     }
     try {
-      const messagesId = await Conversation.findById(conversationId).select(
-        "messages"
-      );
+      const username = await User.findById(userId).select("userName");
+      if (!username) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const conversation = await Conversation.findById(conversationId)
 
-      if (messagesId.messages.length > 0) {
-        lastMsgId = messagesId.messages[messagesId.messages.length - 1];
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+      if (!conversation.members.includes(username.userName) && !conversation.removedMembers.some(member => member.username === username.userName)) {
+        return res
+          .status(403)
+          .json({ message: "Access denied. You're not in this conversation." });
+      }
+      if (conversation.removedMembers.some(member => member.username === username.userName)) {
+        console.log("2")
+        const lastMessage = await Message.findOne({
+          conversationId: conversationId,
+          date: conversation.removedMembers.find(member => member.username === username.userName).date,
+          author: "System/" + conversationId,
+        });
+        if (!lastMessage) {
+          return res.status(404).json({ message: "No message in this conversation" });
+        }
+        return res.status(200).json(lastMessage);
+      }
+      const messagesId = conversation.messages
+      if (messagesId.length > 0) {
+        lastMsgId = messagesId[messagesId.length - 1];
 
         const lastMessage = await Message.findById(lastMsgId);
         res.status(200).json(lastMessage);
