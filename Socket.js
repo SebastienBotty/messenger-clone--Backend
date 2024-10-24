@@ -3,7 +3,7 @@ const {
     emitMsgToUsers,
     emitTypingToUsers,
     emitSeenMsgToUsers,
-    emitMemberChangeToUsers,
+    emitConvUpdateToUsers,
     emitAdminChangeToUsers,
 } = require("./SocketUtils");
 
@@ -32,8 +32,8 @@ const initSocket = (server) => {
             emitSeenMsgToUsers(io, ...data);
         });
 
-        socket.on('membersChange', (data) => {
-            emitMemberChangeToUsers(io, ...data)
+        socket.on('convUpdate', (data) => {
+            emitConvUpdateToUsers(io, ...data)
         })
 
         socket.on("adminChange", (data) => {

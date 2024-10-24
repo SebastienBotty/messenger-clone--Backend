@@ -45,12 +45,12 @@ const emitSeenMsgToUsers = (io, socketIdArr, message, conversation) => {
   });
 };
 
-const emitMemberChangeToUsers = (io, socketIdArr, conversation) => {
+const emitConvUpdateToUsers = (io, socketIdArr, conversation) => {
   console.log(socketIdArr)
   socketIdArr.map((socketId) => {
     if (socketId.socketId) {
-      io.to(socketId.socketId).emit("membersChange", conversation);
-      console.log("Message MEMBER UPDATE envoyé à " + socketId.userName);
+      io.to(socketId.socketId).emit("convUpdate", conversation);
+      console.log("CONVERSATION UPDATE envoyé à " + socketId.userName);
     }
 
   });
@@ -82,4 +82,4 @@ const getUsersSocketId = async (usersNameArr) => {
   return filteredUsersSockets
 }
 
-module.exports = { emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitMemberChangeToUsers, emitAdminChangeToUsers, getUsersSocketId };
+module.exports = { emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitConvUpdateToUsers, emitAdminChangeToUsers, getUsersSocketId };

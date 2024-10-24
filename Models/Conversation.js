@@ -19,7 +19,28 @@ const conversationSchema = Schema({
       type: Date,
       require: true
     }
-  }]
+  }],
+  customization: {
+    conversationName: {
+      type: String,
+      default: ""
+    },
+    photo: {
+      type: String,
+      default: ""
+    },
+    theme: {
+      type: String,
+      default: "#0084ff"
+    },
+    emoji: {
+      type: String,
+      default: "Like"
+    }
+
+
+  }
+
 });
 
 module.exports = mongoose.model("Conversation", conversationSchema);
