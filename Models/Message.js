@@ -15,7 +15,7 @@ const messageSchema = Schema({
   seenBy: [String], //Array of people's userName who saw this msg
   date: {
     //Date when message has been sent
-    type: String,
+    type: Date,
     require: true,
   },
   conversationId: String,
