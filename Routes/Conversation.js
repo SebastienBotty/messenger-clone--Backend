@@ -31,7 +31,7 @@ router.post("/", auth, checkPostConvBody, async (req, res) => {
   const conversation = new Conversation({
     isGroupConversation: isGroupConversation,
     members: members,
-    admin: admin,
+    admin: isGroupConversation ? [admin] : members,
     messages: [],
     creationDate: creationDate,
     removedMembers: [],
@@ -699,7 +699,6 @@ router.patch("/changeEmoji", auth, async (req, res) => {
 
     const conversation = await Conversation.findById(conversationId).session(session);
     if (!conversation) throw new Error("Conversation not found");
-    if (!conversation.isGroupConversation) throw new Error("This is not a group conversation")
     if (!conversation.admin.includes(user.userName)) throw new Error("You are not an admin of this conversation")
 
     conversation.customization.emoji = emoji;
