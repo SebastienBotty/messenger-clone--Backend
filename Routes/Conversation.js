@@ -682,6 +682,63 @@ router.patch("/changeConversationName", auth, async (req, res) => {
   }
 })
 
+// PATCH conversation emoji - Change conversation emoji
+router.patch("/changeEmoji", auth, async (req, res) => {
+  const { conversationId, emoji, userId, date } = req.body;
+  if (!conversationId || !emoji || !userId || !date) return res.status(400).json({ message: "All fields are required" });
+
+  if (req.user.userId !== userId) return res.status(403).json({ message: "Access denied." });
+
+
+  const user = await User.findById(userId).select("userName");
+  if (!user) return res.status(404).json({ message: "User not found" });
+
+  const session = await Conversation.startSession();
+  try {
+    session.startTransaction();
+
+    const conversation = await Conversation.findById(conversationId).session(session);
+    if (!conversation) throw new Error("Conversation not found");
+    if (!conversation.isGroupConversation) throw new Error("This is not a group conversation")
+    if (!conversation.admin.includes(user.userName)) throw new Error("You are not an admin of this conversation")
+
+    conversation.customization.emoji = emoji;
+    await conversation.save({ session });
+
+    const message = new Message({
+      conversationId: conversationId,
+      author: "System/" + conversationId,
+      text: `${user.userName}-changeEmoji-${emoji}`,
+      seenBy: [user.userName],
+      date: new Date(date),
+    })
+
+    const newMessage = await message.save({ session });
+
+    conversation.messages.push(newMessage._id);
+    await conversation.save({ session });
+
+    const conversationObj = conversation.toObject();
+    delete conversationObj.messages;
+
+    const usersTosend = [...conversation.members.filter(member => member !== user.userName)]  // remove the user who sent the request// !! Read commit message !!
+    const socketsIds = await getUsersSocketId(usersTosend);
+    conversationObj.lastMessage = newMessage
+    emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);
+
+    await session.commitTransaction();
+    res.status(200).json({ conversation: conversationObj, message: newMessage });
+
+  }
+
+  catch (error) {
+    await session.abortTransaction();
+    res.status(400).json({ message: error.message });
+  } finally {
+    session.endSession();
+  }
+})
+
 
 
 module.exports = router;
