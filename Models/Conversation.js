@@ -35,7 +35,7 @@ const conversationSchema = Schema({
     },
     emoji: {
       type: String,
-      default: "Like"
+      default: "👍"
     }
 
 
