@@ -214,10 +214,19 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
   const regexUser = new RegExp(user, "i");
 
   try {
-    const conversations = await Conversation.find({
+    let conversations = await Conversation.find({
       members: { $all: [...regexMembers, regexUser] },
     }).select("-messages")
-    console.log("iciXXXXXXXXXXXXXX")
+
+    if (conversations.length === 0) {
+      console.log("RIEN TROUVE")
+      conversations = await Conversation.find({
+        "customization.conversationName": { $in: regexMembers },
+        members: { $in: regexUser },
+      }).select("-messages");
+    }
+
+
     let test = []
     if (conversations) {
       for (let conversation of conversations) {
