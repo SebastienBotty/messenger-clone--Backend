@@ -28,6 +28,7 @@ const emitTypingToUsers = (
   writingUser,
   conversation
 ) => {
+  if (!socketIdArr) return
   socketIdArr.map((socketId) => {
     if (socketId.socketId) {
       io.to(socketId.socketId).emit("typing", [
