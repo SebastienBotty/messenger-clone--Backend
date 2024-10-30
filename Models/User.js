@@ -12,8 +12,12 @@ const userSchema = Schema({
     unique: true,
     required: true,
   },
-  socketId: String,
-  photo: String, //String of image in base64
+  socketId: {
+    type: String,
+  },
+  photo: {
+    type: String,
+  },
   conversations: [String], // Array of ConversationId
 });
 

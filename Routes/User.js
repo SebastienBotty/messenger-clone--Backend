@@ -13,6 +13,8 @@ router.post("/", async (req, res) => {
     mail: mail,
     userName: userName,
     conversations: [],
+    socketId: "",
+    photo: "",
   });
   try {
     const newUser = await user.save();
@@ -70,7 +72,7 @@ router.get("/mail/:mail", async (req, res) => {
   const mail = req.params.mail;
 
   try {
-    const user = await User.findOne({ mail: mail });
+    const user = await User.findOne({ mail: { $regex: new RegExp(`^${mail}$`, "i") } });
     const token = jwt.sign(String(user._id), process.env.JWT_SECRET);
     res.status(200).json([user, { ApiToken: token }]);
   } catch (error) {
