@@ -33,21 +33,21 @@ router.post(
     const timeStamp = Date.now();
     try {
       // Check if folder exists in S3, if not create it
-      await createFolderInS3IfNotExists(bucketName, convId);
 
       // Upload each file to S3
       await Promise.all(
         req.files.map(async (file) => {
+          const isImg = file.mimetype.startsWith("image/");
           const params = {
             Bucket: bucketName,
-            Key: `${convId}/${timeStamp}-${file.originalname}`,
+            Key: `${convId}/${isImg ? "Medias" : 'Files'}/${timeStamp}-${file.originalname}`,
             Body: file.buffer,
             ContentType: file.mimetype,
           };
 
           await s3.upload(params).promise();
 
-          fileNamesArr.push(`${timeStamp}-${file.originalname}`);
+          fileNamesArr.push(`${isImg ? "Medias" : 'Files'}/${timeStamp}-${file.originalname}`);
         })
       );
 
@@ -213,6 +213,61 @@ router.get(
 );
 
 
+/* //Get ALL conversations Images by pagination of 18
+
+const allowedExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "mp4", "avi", "mov", "wmv"];
+
+router.get("/listMediafiles", async (req, res) => {
+
+  const { conversationId, continuationToken, pageSize = 1 } = req.query;
+  const params = {
+    Bucket: bucketName,
+    Prefix: conversationId + '/',
+    MaxKeys: pageSize,
+  };
+
+  if (continuationToken) {
+    params.ContinuationToken = continuationToken;
+  }
+
+  try {
+    const data = await s3.listObjectsV2(params).promise()
+    const mediaFiles = data.Contents.filter(item => {
+      const extension = item.Key.split('.').pop().toLowerCase();
+      return allowedExtensions.includes(extension);
+    });
+    console.log(data.Contents)
+    console.log('----------------------------------------------------------------------------------------')
+    console.log(mediaFiles)
+
+
+    // Générer un lien signé pour chaque fichier
+    const mediaFilesWithUrls = await Promise.all(mediaFiles.map(async (file) => {
+      const signedUrl = s3.getSignedUrl('getObject', {
+        Bucket: bucketName,
+        Key: file.Key,
+        Expires: 60 * 60,  // Lien valable pour 1 heure
+      });
+
+      return {
+        Key: file.Key,
+        LastModified: file.LastModified,
+        Size: file.Size,
+        Url: signedUrl,
+      };
+    }));
+    res.status(200).json({
+      mediaFiles: mediaFilesWithUrls,
+      continuationToken: data.NextContinuationToken || null,
+    });
+  } catch (error) {
+    console.error("Erreur lors de la récupération des fichiers:", error);
+    res.status(400).json({ message: error.message });
+  }
+});
+
+ */
+//GET all conversation images older ans newer than a given date
 router.get("/conversationId/:conversationId/getConversationImages", async (req, res) => {
 
   const convId = req.params.conversationId;
@@ -226,7 +281,7 @@ router.get("/conversationId/:conversationId/getConversationImages", async (req, 
   const params = {
     Bucket: bucketName,
     ContinuationToken: continuationToken,
-    Prefix: convId + '/',
+    Prefix: convId + '/Medias/',
   };
   try {
 
@@ -251,6 +306,8 @@ router.get("/conversationId/:conversationId/getConversationImages", async (req, 
 
     const olderFiles = await getOlderFiles(continuationToken, referenceDate, referenceKey, convId);
     const newerFiles = await getNewerFiles(continuationToken, referenceDate, referenceKey, convId);
+    console.log("7777777777777777777777777777777777777777777777777777777777")
+    console.log(fileName)
     files.push({ Key: convId + '/' + fileName })
     files.unshift(...olderFiles)
     files.push(...newerFiles)
@@ -288,7 +345,7 @@ const getOlderFiles = async (continuationTkn, referenceDate, referenceKey, convI
   const params = {
     Bucket: bucketName,
     ContinuationToken: continuationToken,
-    Prefix: convId + '/',
+    Prefix: convId + '/Medias/',
   };
 
   do {
@@ -320,7 +377,7 @@ const getNewerFiles = async (continuationTkn, referenceDate, referenceKey, convI
   const params = {
     Bucket: bucketName,
     ContinuationToken: continuationToken,
-    Prefix: convId + '/',
+    Prefix: convId + '/Medias/',
   };
   console.log(referenceKey)
   do {
@@ -354,21 +411,25 @@ function isImage(fileName) {
 }
 
 const copyImageOnS3 = async (imgFilePath, conversationIdTarget, date) => {
-  const fileNameWithTimeStamp = imgFilePath.split("/")[1]
+  const fileNameWithTimeStamp = imgFilePath.split("/")[2]
   const fileNameWithoutTimeStamp = fileNameWithTimeStamp.substring(fileNameWithTimeStamp.indexOf('-') + 1)
 
   const newTimeStamp = new Date(date).getTime();
-
+  console.log('999999999999999999999999999999999')
+  console.log(imgFilePath)
+  console.log(fileNameWithTimeStamp)
+  console.log(fileNameWithoutTimeStamp)
+  console.log(`/${bucketName}/${imgFilePath}`)
   const params = {
     Bucket: bucketName,
     CopySource: `/${bucketName}/${imgFilePath}`, // Chemin d'origine
-    Key: `${conversationIdTarget}/${newTimeStamp}-${fileNameWithoutTimeStamp}`, // Chemin cible
+    Key: `${conversationIdTarget}/Medias/${newTimeStamp}-${fileNameWithoutTimeStamp}`, // Chemin cible
   };
 
   try {
     await s3.copyObject(params).promise();
     console.log("Image copied successfully");
-    return `${conversationIdTarget}:${newTimeStamp}-${fileNameWithoutTimeStamp}`
+    return `${conversationIdTarget}:Medias/${newTimeStamp}-${fileNameWithoutTimeStamp}`
   } catch (error) {
     console.error("Error copying image on S3:", error.message);
     return false
@@ -379,13 +440,20 @@ const copyImageOnS3 = async (imgFilePath, conversationIdTarget, date) => {
 async function createFolderInS3IfNotExists(bucketName, folderName) {
   console.log(bucketName, folderName);
   try {
-    const params = {
+    const paramsMedias = {
       Bucket: bucketName,
-      Key: `${folderName}/`, // Note: Using a slash to simulate a folder
+      Key: `${folderName}/Medias/`, // Note: Using a slash to simulate a folder
+      Body: "",
+    };
+    const paramsFiles = {
+      Bucket: bucketName,
+      Key: `${folderName}/Files/`, // Note: Using a slash to simulate a folder
       Body: "",
     };
 
-    await s3.upload(params).promise();
+    await s3.upload(paramsMedias).promise();
+    await s3.upload(paramsFiles).promise();
+
   } catch (err) {
     if (err.code !== "EntityAlreadyExists") {
       throw err;
