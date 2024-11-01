@@ -52,7 +52,7 @@ router.post("/", auth, checkPostMsgBody, async (req, res) => {
 //Get all messages of a conversation ADMIN
 router.get("/getAllMessages", authAdmin, async (req, res) => {
   const convId = req.query.conversationId;
-  console.log(convId)
+  //console.log(convId)
   try {
     const messages = await Message.find({ conversationId: convId }).sort({ date: -1 });
     res.status(200).json(messages);
@@ -149,7 +149,7 @@ router.get("/userId/:userId/searchMessages", auth, async (req, res) => {
   const convId = req.query.conversation;
   const word = req.query.word;
 
-  console.log(userId, convId, word);
+  //console.log(userId, convId, word);
   if (userId !== req.user.userId) {
     return res
       .status(403)

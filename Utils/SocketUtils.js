@@ -10,7 +10,7 @@ const emitMsgToUsers = (
   precedentMessage
 ) => {
   socketIdArr.map((socketId) => {
-    console.log(message, conversation)
+    //console.log(message, conversation)
 
     io.to(socketId.socketId).emit("message", [
       message,
@@ -52,7 +52,7 @@ const emitSeenMsgToUsers = (io, socketIdArr, message, conversation) => {
 };
 
 const emitConvUpdateToUsers = (io, socketIdArr, conversation) => {
-  console.log(socketIdArr)
+  //console.log(socketIdArr)
   socketIdArr.map((socketId) => {
     if (socketId.socketId) {
       io.to(socketId.socketId).emit("convUpdate", conversation);

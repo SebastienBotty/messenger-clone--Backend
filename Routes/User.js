@@ -38,12 +38,12 @@ router.get("/", authAdmin, async (req, res) => {
 router.get("/username?", auth, async (req, res) => {
   try {
     const searchQuery = req.query.search;
-    console.log(req.query.exceptions)
+    //console.log(req.query.exceptions)
 
     if (req.query.exceptions) {
       const exceptions = JSON.parse(decodeURIComponent(req.query.exceptions));
 
-      console.log(exceptions)
+      //console.log(exceptions)
       const users = await User.find({
         userName: {
           $regex: `.*${searchQuery}.*`,
@@ -52,7 +52,7 @@ router.get("/username?", auth, async (req, res) => {
         }
       }).select("-conversations");
 
-      console.log("exceptions")
+      //console.log("exceptions")
       return res.json(users);
     }
 
@@ -60,7 +60,7 @@ router.get("/username?", auth, async (req, res) => {
     const users = await User.find({
       userName: { $regex: `.*${searchQuery}.*`, $options: "i" },
     }).select("-conversations");
-    console.log('non exceptions')
+    //console.log('non exceptions')
     res.json(users);
   } catch (error) {
     res.status(400).json({ message: error.message });

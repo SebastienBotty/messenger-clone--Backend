@@ -127,7 +127,7 @@ router.get(
           .json({ message: "Access denied. You're not in this conversation." });
       }
       if (conversation.removedMembers.some(member => member.username === username.userName)) {
-        console.log("2")
+        //console.log("2")
         const lastMessage = await Message.findOne({
           conversationId: conversationId,
           date: conversation.removedMembers.find(member => member.username === username.userName).date,
@@ -162,7 +162,7 @@ router.get("/userId/:userId/privateConversation?", auth, async (req, res) => {
   const userId = req.params.userId;
   const username = req.query.username;
   const recipientUsername = req.query.recipient;
-  console.log(userId, username, recipientUsername);
+  //console.log(userId, username, recipientUsername);
 
   if (userId !== req.user.userId) {
     return res
@@ -219,7 +219,7 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
     }).select("-messages")
 
     if (conversations.length === 0) {
-      console.log("RIEN TROUVE")
+      //console.log("RIEN TROUVE")
       conversations = await Conversation.find({
         "customization.conversationName": { $in: regexMembers },
         members: { $in: regexUser },
@@ -264,7 +264,7 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
 
 router.patch("/addMembers", auth, async (req, res) => {
   const { conversationId, adderUsername, adderUserId, addedUsers, date } = req.body;
-  console.log(req.body)
+  //console.log(req.body)
 
   if (!conversationId || !adderUsername || !adderUserId || !addedUsers || !addedUsers.length || !date) {
     return res.status(400).json({ message: "All fields are required" });
@@ -324,8 +324,8 @@ router.patch("/addMembers", auth, async (req, res) => {
       }
 
       if (conversation.removedMembers.some(member => member.username === addedUsername)) {
-        console.log("here")
-        console.log(conversation.removedMembers)
+        //console.log("here")
+        //console.log(conversation.removedMembers)
         conversation.removedMembers = conversation.removedMembers.filter(member => member.username !== addedUsername)
       }
 
@@ -422,7 +422,7 @@ router.patch("/removeUser", auth, async (req, res) => {
 // PATCH CONV MEMBERS - Users leaves group conversation
 router.patch("/leaveConversation", auth, async (req, res) => {
   const { conversationId, username, userId, date } = req.body;
-  console.log(req.body)
+  //console.log(req.body)
   if (!conversationId || !username || !userId || !date) {
     return res.status(400).json({ message: "All fields are required" });
   }
@@ -474,7 +474,7 @@ router.patch("/leaveConversation", auth, async (req, res) => {
     conversationObj.lastMessage = newMessage
     const usersTosend = [...conversation.members, username]
     const socketsIds = await getUsersSocketId(usersTosend);
-    console.log("LAAAALALALALALALALALALALALALA")
+    //console.log("LAAAALALALALALALALALALALALALA")
     emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);
 
     await session.commitTransaction();
@@ -530,8 +530,8 @@ router.patch("/setAdmin", auth, async (req, res) => {
 // PATCH ADMIN - Remove someone admin of a group conversation
 router.patch("/removeAdmin", auth, async (req, res) => {
   const { conversationId, username, removerUserId, removedUsername } = req.body;
-  console.log(req.body)
-  console.log(conversationId, removedUsername, removerUserId, username)
+  //console.log(req.body)
+  //console.log(conversationId, removedUsername, removerUserId, username)
   if (!conversationId || !removerUserId || !removedUsername || !username) {
     return res.status(400).json({ message: "All fields are required" });
   }
