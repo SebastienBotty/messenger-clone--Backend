@@ -1,5 +1,5 @@
 
-const User = require("./Models/User");
+const User = require("../Models/User");
 
 
 const emitMsgToUsers = (

@@ -7,7 +7,7 @@ const { auth, authAdmin } = require("../Middlewares/authentication");
 const checkPostConvBody = require("../Middlewares/Conversation");
 
 const { getIo } = require('../Socket') // Importer le serveur Socket.IO initialisé
-const { emitConvUpdateToUsers, getUsersSocketId } = require('../SocketUtils');
+const { emitConvUpdateToUsers, getUsersSocketId } = require('../Utils/SocketUtils');
 
 
 //----------------------POST---------------------------

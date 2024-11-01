@@ -5,7 +5,7 @@ const {
     emitSeenMsgToUsers,
     emitConvUpdateToUsers,
     emitAdminChangeToUsers,
-} = require("./SocketUtils");
+} = require("./Utils/SocketUtils");
 
 let io
 //------------------Web Socket
