@@ -5,6 +5,7 @@ const AWS = require("aws-sdk");
 require("dotenv").config();
 const { auth } = require("../Middlewares/authentication");
 const Conversation = require("../Models/Conversation");
+const File = require("../Models/File");
 const APIUrl = process.env.API_URL
 
 AWS.config.update({
@@ -22,7 +23,7 @@ const upload = multer({
   storage: storage,
 });
 //----------------------------------------------------------POST
-// Route to receive files from frontend
+// Route to upload files from frontend
 router.post(
   "/upload/:conversationId",
   auth,
@@ -37,17 +38,27 @@ router.post(
       // Upload each file to S3
       await Promise.all(
         req.files.map(async (file) => {
-          const isImg = file.mimetype.startsWith("image/");
+          const type = file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/") ? "Medias" : "Files";
           const params = {
             Bucket: bucketName,
-            Key: `${convId}/${isImg ? "Medias" : 'Files'}/${timeStamp}-${file.originalname}`,
+            Key: `${convId}/${type}/${timeStamp}-${file.originalname}`,
             Body: file.buffer,
             ContentType: file.mimetype,
           };
 
           await s3.upload(params).promise();
 
-          fileNamesArr.push(`${isImg ? "Medias" : 'Files'}/${timeStamp}-${file.originalname}`);
+          console.log(file.originalname)
+          const newFile = new File({
+            conversationId: convId,
+            pathName: `${convId}/${type}/${timeStamp}-${file.originalname}`,
+            type: type,
+            lastModified: timeStamp,
+          });
+
+          await newFile.save();
+
+          fileNamesArr.push(`${type}/${timeStamp}-${file.originalname}`);
         })
       );
 
@@ -71,7 +82,7 @@ router.post("/userId/:userId/transferImage", auth, async (req, res) => {
   const filePath = fileUrl.split("?")[0].split('amazonaws.com/')[1];
   const conversationIdSource = filePath.split("/")[0]
 
-  console.log("Route appelée")
+  //console.log("Route appelée")
 
 
   if (userId !== req.user.userId) {
@@ -81,11 +92,11 @@ router.post("/userId/:userId/transferImage", auth, async (req, res) => {
   }
   const conversationSource = await Conversation.findById(conversationIdSource).select("members");
   if (!conversationSource) {
-    console.log('Conversation non trouvée')
+    //console.log('Conversation non trouvée')
     return res.status(404).json({ message: "Conversation not found" });
   }
   if (!conversationSource.members.some(member => new RegExp("^" + sender + "$", "i").test(member))) {
-    console.log('Membre pas dans la convo cible')
+    //console.log('Membre pas dans la convo cible')
     return res.status(403).json({ message: "You are not a member of the source conversation" });
   }
 
@@ -101,10 +112,30 @@ router.post("/userId/:userId/transferImage", auth, async (req, res) => {
   await createFolderInS3IfNotExists(bucketName, targetConversationId);
 
   const copyImage = await copyImageOnS3(filePath, targetConversationId, date);
+  console.log(copyImage)
 
   if (!copyImage) {
     return res.status(500).json({ message: "Failed to copy image" });
   }
+  const copyPath = copyImage.replace(":", "/");
+  const params = {
+    Bucket: bucketName,
+    Key: copyPath,
+  }
+
+  const data = await s3.headObject(params).promise();
+  console.log("444444444444444444444444444")
+  console.log(data.Metadata)
+
+  const newFile = new File({
+    conversationId: targetConversationId,
+    pathName: copyPath,
+    type: "Medias",
+    lastModified: new Date(date).getTime(),
+  });
+
+  await newFile.save();
+
   const newMessage = {
     author: sender,
     authorId: userId,
@@ -133,7 +164,7 @@ router.post("/userId/:userId/transferImage", auth, async (req, res) => {
     }
     console.log("Image transfered successfully");
     const data = await response.json();
-    console.log(data);
+    //console.log(data);
     return res.status(200).json(data);
   } catch (error) {
     console.log(error.message);
@@ -170,12 +201,12 @@ router.get(
           try {
             const data = await s3.headObject(params).promise();
             const mimeType = data.ContentType;
-            console.log(data);
-            console.log(mimeType);
             const signedUrl = s3.getSignedUrl("getObject", {
               Bucket: bucketName,
               Key: params.Key,
               ResponseContentDisposition: "attachment", // Indique au navigateur de télécharger le fichier plutôt que de l'afficher
+              Expires: 60 * 60 * 24
+
             });
             return {
               fileName,
@@ -213,9 +244,51 @@ router.get(
 );
 
 
-/* //Get ALL conversations Images by pagination of 18
+//GET Recents  images of conversation with pagination of 18 images
+router.get('/userId/:userId/conversationId/:conversationId/getRecentImages', async (req, res) => {
+  const { start } = req.query;
+  const { conversationId, userId } = req.params;
+  const pageSize = 24
+  if (!conversationId || !start || !userId) {
+    return res.status(400).json({ message: "Missing required parameters" });
+  }
 
-const allowedExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "mp4", "avi", "mov", "wmv"];
+  try {
+    const images = await File.find({
+      conversationId,
+      type: "Medias",
+    })
+      .sort({ lastModified: -1 })
+      .skip(start)
+      .limit(pageSize);
+
+    if (images.length === 0) {
+      return res.status(200).json([]);
+    }
+    const imagesWithUrls = await Promise.all(images.map(async (image) => {
+      const signedUrl = s3.getSignedUrl("getObject", {
+        Bucket: bucketName,
+        Key: image.pathName,
+        ResponseContentDisposition: "inline",
+        Expires: 60 * 60 * 24
+      });
+      return {
+        Key: image.pathName,
+        Url: signedUrl,
+        LastModified: image.lastModified
+      };
+    }));
+    return res.status(200).json(imagesWithUrls)
+
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+
+
+})
+
+/* not used anymore but wanna keep if i want to use it
+const allowedExtensions = ["jpg", "jpeg", "png", "gif", "webp", "svg"];
 
 router.get("/listMediafiles", async (req, res) => {
 
@@ -265,14 +338,13 @@ router.get("/listMediafiles", async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 });
-
  */
 //GET all conversation images older ans newer than a given date
 router.get("/conversationId/:conversationId/getConversationImages", async (req, res) => {
 
   const convId = req.params.conversationId;
   const fileName = req.query.fileName;
-  console.log(convId, fileName)
+  //console.log(convId, fileName)
 
   let continuationToken = null;
   let referenceDate = null;
@@ -290,7 +362,7 @@ router.get("/conversationId/:conversationId/getConversationImages", async (req, 
       if (referenceDate === null) {
         const referenceObject = data.Contents.find(obj => obj.Key === referenceKey);
         if (referenceObject) {
-          console.log(referenceObject)
+          //console.log(referenceObject)
           referenceDate = referenceObject.LastModified;
         }
         if (referenceDate) break;
@@ -306,8 +378,8 @@ router.get("/conversationId/:conversationId/getConversationImages", async (req, 
 
     const olderFiles = await getOlderFiles(continuationToken, referenceDate, referenceKey, convId);
     const newerFiles = await getNewerFiles(continuationToken, referenceDate, referenceKey, convId);
-    console.log("7777777777777777777777777777777777777777777777777777777777")
-    console.log(fileName)
+    //console.log("7777777777777777777777777777777777777777777777777777777777")
+    //console.log(fileName)
     files.push({ Key: convId + '/' + fileName })
     files.unshift(...olderFiles)
     files.push(...newerFiles)
@@ -325,6 +397,8 @@ router.get("/conversationId/:conversationId/getConversationImages", async (req, 
         Bucket: bucketName,
         Key: item.Key,
         ResponseContentDisposition: "attachment", // Indique au navigateur de télécharger le fichier spéc que de l'afficher
+        Expires: 60 * 60 * 24
+
       });
       return { fileName: item.Key.split("/")[1], src: signedUrl }
     })
@@ -379,7 +453,7 @@ const getNewerFiles = async (continuationTkn, referenceDate, referenceKey, convI
     ContinuationToken: continuationToken,
     Prefix: convId + '/Medias/',
   };
-  console.log(referenceKey)
+  //console.log(referenceKey)
   do {
     const data = await s3.listObjectsV2(params).promise();
 
@@ -409,17 +483,24 @@ function isImage(fileName) {
   ];
   return imageExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
 }
+function isVideo(fileName) {
+  const videoExtensions = [
+    '.mp4', '.mkv', '.mov', '.avi', '.wmv', '.flv', '.webm',
+    '.mpeg', '.mpg', '.3gp', '.m4v', '.f4v', '.hevc'
+  ];
+  return videoExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
+}
 
 const copyImageOnS3 = async (imgFilePath, conversationIdTarget, date) => {
   const fileNameWithTimeStamp = imgFilePath.split("/")[2]
   const fileNameWithoutTimeStamp = fileNameWithTimeStamp.substring(fileNameWithTimeStamp.indexOf('-') + 1)
 
   const newTimeStamp = new Date(date).getTime();
-  console.log('999999999999999999999999999999999')
-  console.log(imgFilePath)
-  console.log(fileNameWithTimeStamp)
-  console.log(fileNameWithoutTimeStamp)
-  console.log(`/${bucketName}/${imgFilePath}`)
+  //console.log('999999999999999999999999999999999')
+  //console.log(imgFilePath)
+  //console.log(fileNameWithTimeStamp)
+  //console.log(fileNameWithoutTimeStamp)
+  //console.log(`/${bucketName}/${imgFilePath}`)
   const params = {
     Bucket: bucketName,
     CopySource: `/${bucketName}/${imgFilePath}`, // Chemin d'origine
@@ -427,7 +508,8 @@ const copyImageOnS3 = async (imgFilePath, conversationIdTarget, date) => {
   };
 
   try {
-    await s3.copyObject(params).promise();
+    const test = await s3.copyObject(params).promise();
+    console.log(test)
     console.log("Image copied successfully");
     return `${conversationIdTarget}:Medias/${newTimeStamp}-${fileNameWithoutTimeStamp}`
   } catch (error) {
@@ -438,7 +520,7 @@ const copyImageOnS3 = async (imgFilePath, conversationIdTarget, date) => {
 
 // Function to create a folder in S3 if it doesn't already exist
 async function createFolderInS3IfNotExists(bucketName, folderName) {
-  console.log(bucketName, folderName);
+  //console.log(bucketName, folderName);
   try {
     const paramsMedias = {
       Bucket: bucketName,
