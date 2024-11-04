@@ -73,21 +73,13 @@ const emitAdminChangeToUsers = (io, socketIdArr, adminArrAndConvId,) => {
 
 
 
-const getUsersSocketId = async (usersNameArr) => {
-  const usersSockets = await Promise.all(
-    usersNameArr.map(async (userName) => {
-      const user = await User.findOne(
-        { userName: { $regex: `.*${userName}.*`, $options: "i" } },
-        { socketId: 1 }
-      );
-      if (!user) {
-        return null;
-      }
-      return { userName: userName, socketId: user.socketId };
-    })
-  );
-  const filteredUsersSockets = usersSockets.filter((socket) => socket !== null);
-  return filteredUsersSockets
+const emitNewFileToUsers = (io, socketIdArr, data, conversation) => {
+  socketIdArr.map((socketId) => {
+    if (socketId.socketId) {
+      io.to(socketId.socketId).emit("newFile", [data, conversation]);
+      console.log("Message NEW FILE envoyé à " + socketId.userName);
+    }
+  });
 }
 
-module.exports = { emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitConvUpdateToUsers, emitAdminChangeToUsers, getUsersSocketId };
+module.exports = { emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitConvUpdateToUsers, emitAdminChangeToUsers, emitNewFileToUsers };

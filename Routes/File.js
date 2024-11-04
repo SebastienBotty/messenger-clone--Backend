@@ -1,20 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
-const AWS = require("aws-sdk");
 require("dotenv").config();
 const { auth } = require("../Middlewares/authentication");
 const Conversation = require("../Models/Conversation");
 const File = require("../Models/File");
+const s3 = require('../Config/S3')
 const APIUrl = process.env.API_URL
 
-AWS.config.update({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION,
-});
 
-const s3 = new AWS.S3({});
 const bucketName = process.env.AWS_BUCKET_NAME;
 
 // Configure multer to use memory storage
@@ -64,6 +58,7 @@ router.post(
       );
 
       res.status(200).json({ fileNames: fileNamesArr });
+      console.log('res')
     } catch (err) {
       console.error("Error uploading files to S3:", err);
       res.status(500).send("Failed to upload files.");
