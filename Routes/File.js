@@ -48,12 +48,13 @@ router.post(
 
           await s3.upload(params).promise();
 
-          console.log(file.originalname)
+          //console.log(file.originalname)
           const newFile = new File({
             conversationId: convId,
             pathName: `${convId}/${type}/${timeStamp}-${file.originalname}`,
             type: type,
             lastModified: timeStamp,
+            size: file.size,
           });
 
           await newFile.save();
@@ -112,7 +113,7 @@ router.post("/userId/:userId/transferImage", auth, async (req, res) => {
   await createFolderInS3IfNotExists(bucketName, targetConversationId);
 
   const copyImage = await copyImageOnS3(filePath, targetConversationId, date);
-  console.log(copyImage)
+  //console.log(copyImage)
 
   if (!copyImage) {
     return res.status(500).json({ message: "Failed to copy image" });
@@ -124,14 +125,15 @@ router.post("/userId/:userId/transferImage", auth, async (req, res) => {
   }
 
   const data = await s3.headObject(params).promise();
-  console.log("444444444444444444444444444")
-  console.log(data.Metadata)
+  //console.log("444444444444444444444444444")
+  //console.log(data)
 
   const newFile = new File({
     conversationId: targetConversationId,
     pathName: copyPath,
     type: "Medias",
     lastModified: new Date(date).getTime(),
+    size: data.ContentLength
   });
 
   await newFile.save();
@@ -181,8 +183,8 @@ router.get(
     const convId = req.params.conversationId;
     const fileNames = req.query.fileNames.split(",");
 
-    console.log(convId);
-    console.log(fileNames);
+    //console.log(convId);
+    //console.log(fileNames);
 
     if (!Array.isArray(fileNames) || fileNames.length === 0) {
       return res.status(400).json({
@@ -245,8 +247,8 @@ router.get(
 
 
 //GET Recents  images of conversation with pagination of 18 images
-router.get('/userId/:userId/conversationId/:conversationId/getRecentImages', async (req, res) => {
-  const { start } = req.query;
+router.get('/userId/:userId/conversationId/:conversationId/getRecentFiles', async (req, res) => {
+  const { start, fileType } = req.query;
   const { conversationId, userId } = req.params;
   const pageSize = 24
   if (!conversationId || !start || !userId) {
@@ -254,31 +256,32 @@ router.get('/userId/:userId/conversationId/:conversationId/getRecentImages', asy
   }
 
   try {
-    const images = await File.find({
+    const files = await File.find({
       conversationId,
-      type: "Medias",
+      type: fileType,
     })
       .sort({ lastModified: -1 })
       .skip(start)
       .limit(pageSize);
 
-    if (images.length === 0) {
+    if (files.length === 0) {
       return res.status(200).json([]);
     }
-    const imagesWithUrls = await Promise.all(images.map(async (image) => {
+    const filesWithUrls = await Promise.all(files.map(async (file) => {
       const signedUrl = s3.getSignedUrl("getObject", {
         Bucket: bucketName,
-        Key: image.pathName,
-        ResponseContentDisposition: "inline",
+        Key: file.pathName,
+        ResponseContentDisposition: "attachment",
         Expires: 60 * 60 * 24
       });
       return {
-        Key: image.pathName,
+        Key: file.pathName,
         Url: signedUrl,
-        LastModified: image.lastModified
+        LastModified: file.lastModified,
+        Size: file.size
       };
     }));
-    return res.status(200).json(imagesWithUrls)
+    return res.status(200).json(filesWithUrls)
 
   } catch (error) {
     return res.status(500).json({ message: error.message });
@@ -509,8 +512,8 @@ const copyImageOnS3 = async (imgFilePath, conversationIdTarget, date) => {
 
   try {
     const test = await s3.copyObject(params).promise();
-    console.log(test)
-    console.log("Image copied successfully");
+    //(test)
+    //console.log("Image copied successfully");
     return `${conversationIdTarget}:Medias/${newTimeStamp}-${fileNameWithoutTimeStamp}`
   } catch (error) {
     console.error("Error copying image on S3:", error.message);

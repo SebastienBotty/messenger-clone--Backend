@@ -7,7 +7,8 @@ const FileSchema = new Schema({
     conversationId: String,
     pathName: String,
     lastModified: Date,
-    type: String,  // 'image' ou 'video'
+    type: String,
+    size: Number,
 });
 
 
