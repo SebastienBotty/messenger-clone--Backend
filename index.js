@@ -8,7 +8,7 @@ const http = require("http");
 const server = http.createServer(app);
 require("dotenv").config();
 
-const { initSocket } = require("./Socket");
+const { initSocket } = require("./Config/Socket");
 
 //------------------Express
 const conversationRouter = require("./Routes/Conversation");
