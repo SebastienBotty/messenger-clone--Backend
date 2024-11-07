@@ -19,6 +19,19 @@ const userSchema = Schema({
     type: String,
   },
   conversations: [String], // Array of ConversationId
+  isOnline: {
+    type: Boolean,
+    default: true
+  },
+  lastSeen: {
+    type: Date,
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ["Online", "Offline", "Busy"],
+    default: "Online"
+  }
 });
 
 module.exports = mongoose.model("User", userSchema);

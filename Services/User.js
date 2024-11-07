@@ -17,4 +17,19 @@ const getUsersSocketId = async (usersNameArr) => {
     return filteredUsersSockets
 }
 
-module.exports = { getUsersSocketId }
+const setUserOffline = async (socketId) => {
+    const user = await User.findOne({ socketId: socketId });
+    if (!user) {
+        console.log("user non trouvé")
+        return null;
+    }
+    user.isOnline = false;
+    user.lastSeen = new Date();
+    user.socketId = "";
+    console.log(user)
+    await user.save();
+    return user.userName;
+}
+
+
+module.exports = { getUsersSocketId, setUserOffline }

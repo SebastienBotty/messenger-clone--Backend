@@ -87,14 +87,36 @@ router.get("/userId/:userId/getConversations?", auth, async (req, res) => {
   if (req.user.userId !== userId) {
     return res.status(403).send("Access denied.");
   }
-  try {
-    const conversations = await Conversation.find({
-      _id: {
-        $in: conversationsIds.map((id) => id),
-      },
-    }).select("-messages");
+  let convsArr = []
 
-    res.status(200).json(conversations);
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    for (convId of conversationsIds) {
+      const conversation = await Conversation.findById(convId).select('-messages');
+      if (!conversation.isGroupConversation) {
+        let objConv = conversation.toObject()
+        const otherUsername = conversation.members.find(member => member !== user.userName)
+        const otherUser = await User.findOne({ userName: otherUsername })
+        otherUserInfos = {
+          status: otherUser.status,
+          photo: otherUser.photo,
+          username: otherUser.userName,
+          lastSeen: otherUser.lastSeen
+        }
+        objConv.partnerInfos = otherUserInfos
+        convsArr.push(objConv)
+
+      } else {
+        convsArr.push(conversation)
+      }
+
+    }
+
+
+    res.status(200).json(convsArr);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

@@ -15,6 +15,7 @@ router.post("/", async (req, res) => {
     conversations: [],
     socketId: "",
     photo: "",
+    lastSeen: new Date(),
   });
   try {
     const newUser = await user.save();
@@ -75,6 +76,7 @@ router.get("/mail/:mail", async (req, res) => {
     const user = await User.findOne({ mail: { $regex: new RegExp(`^${mail}$`, "i") } });
     const token = jwt.sign(String(user._id), process.env.JWT_SECRET);
     res.status(200).json([user, { ApiToken: token }]);
+
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -167,11 +169,12 @@ router.get("/userId/:userId/getLatestConversations?", auth, async (req, res) => 
 
 
 //-------------------------PATCH
+//PATCH socketId, isOnline, lastSeen
 router.patch("/userId/:userId/socketId", auth, async (req, res) => {
   const userId = req.params.userId;
   const socketId = req.body.socketId;
   if (req.user.userId !== userId) {
-    return res.status(403).send("Access denied.");
+    return res.status(403).json({ message: "Access denied." });
   }
   try {
     const user = await User.findOne({ _id: userId });
@@ -179,11 +182,40 @@ router.patch("/userId/:userId/socketId", auth, async (req, res) => {
       res.status(404).json({ message: "User not found" });
     }
     user.socketId = socketId;
+    user.isOnline = true;
+    if (user.status !== "offline") user.lastSeen = new Date();
+    console.log(user)
     await user.save();
     res.status(200).json(user.socketId);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 });
+
+
+//PATCH user status & lastSeen
+router.patch("/:userId/changeStatus", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const status = req.body.status;
+  if (req.user.userId !== userId) {
+    return res.status(403).json({ message: "Access denied." });
+  }
+
+  try {
+    const user = await User.findByIdAndUpdate(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    user.status = status;
+    if (status === "offline") user.lastSeen = new Date();
+
+    await user.save();
+    res.status(200).json(user.status);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+})
+
+
 
 module.exports = router;

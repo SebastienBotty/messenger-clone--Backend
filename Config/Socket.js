@@ -6,6 +6,7 @@ const {
     emitConvUpdateToUsers,
     emitAdminChangeToUsers,
 } = require("../Utils/SocketUtils");
+const { setUserOffline } = require("../Services/User");
 
 let io
 //------------------Web Socket
@@ -40,8 +41,9 @@ const initSocket = (server) => {
             emitAdminChangeToUsers(io, ...data)
         })
 
-        socket.on("disconnect", (socket) => {
-            console.log(socket + " disconnected");
+        socket.on("disconnect", () => {
+            console.log(socket.id + " disconnected");
+            setUserOffline(socket.id);
         });
     });
 
