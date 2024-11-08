@@ -4,6 +4,8 @@ const User = require("../Models/User");
 const Conversation = require("../Models/Conversation");
 const jwt = require("jsonwebtoken");
 const { auth, authAdmin } = require("../Middlewares/authentication");
+const { emitStatusChangeToUsers, emitUserOnlineStatus } = require("../Utils/SocketUtils");
+const { getIo } = require('../Config/Socket')
 require("dotenv").config();
 
 //-------------------------POST
@@ -183,9 +185,11 @@ router.patch("/userId/:userId/socketId", auth, async (req, res) => {
     }
     user.socketId = socketId;
     user.isOnline = true;
-    if (user.status !== "offline") user.lastSeen = new Date();
+    if (user.status !== "Offline") user.lastSeen = new Date();
     console.log(user)
     await user.save();
+    const emitData = { username: user.userName, isOnline: user.isOnline, userId: user._id, lastSeen: user.lastSeen, socketId: user.socketId };
+    emitUserOnlineStatus(getIo(), emitData);
     res.status(200).json(user.socketId);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -203,14 +207,16 @@ router.patch("/:userId/changeStatus", auth, async (req, res) => {
 
   try {
     const user = await User.findByIdAndUpdate(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    user.status = status;
-    if (status === "offline") user.lastSeen = new Date();
+    let lastSeen = new Date();
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (status === "Offline") user.lastSeen = lastSeen;
 
+    user.status = status;
     await user.save();
-    res.status(200).json(user.status);
+    const emitData = { username: user.userName, userId: user._id, status: user.status, lastSeen: lastSeen, socketId: user.socketId };
+    emitStatusChangeToUsers(getIo(), emitData);
+    res.status(200).json({ status: user.status, lastSeen: lastSeen });
+
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

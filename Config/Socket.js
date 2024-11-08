@@ -5,6 +5,7 @@ const {
     emitSeenMsgToUsers,
     emitConvUpdateToUsers,
     emitAdminChangeToUsers,
+    emitUserOnlineStatus
 } = require("../Utils/SocketUtils");
 const { setUserOffline } = require("../Services/User");
 
@@ -19,7 +20,7 @@ const initSocket = (server) => {
 
     io.on("connection", (socket) => {
         console.log(socket.id + " connected");
-
+        //emitUserOnlineStatus()
         socket.on("typing", (data) => {
             // console.log(data);
             emitTypingToUsers(io, ...data);
@@ -41,9 +42,10 @@ const initSocket = (server) => {
             emitAdminChangeToUsers(io, ...data)
         })
 
-        socket.on("disconnect", () => {
+        socket.on("disconnect", async () => {
             console.log(socket.id + " disconnected");
-            setUserOffline(socket.id);
+            const user = await setUserOffline(socket.id);
+            emitUserOnlineStatus(io, user);
         });
     });
 

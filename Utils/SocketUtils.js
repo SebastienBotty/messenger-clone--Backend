@@ -82,4 +82,12 @@ const emitNewFileToUsers = (io, socketIdArr, data, conversation) => {
   });
 }
 
-module.exports = { emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitConvUpdateToUsers, emitAdminChangeToUsers, emitNewFileToUsers };
+const emitStatusChangeToUsers = (io, userData) => {
+  io.except(userData.socketId).emit('changeStatus', { status: userData.status, lastSeen: userData.lastSeen, userId: userData.userId, username: userData.username });
+}
+
+const emitUserOnlineStatus = (io, userData) => {
+  io.except(userData.socketId).emit('isUserOnline', { isOnline: userData.isOnline, lastSeen: userData.lastSeen, userId: userData.userId, username: userData.username });
+}
+
+module.exports = { emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitConvUpdateToUsers, emitAdminChangeToUsers, emitNewFileToUsers, emitStatusChangeToUsers, emitUserOnlineStatus };

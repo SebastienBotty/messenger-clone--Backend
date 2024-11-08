@@ -104,7 +104,9 @@ router.get("/userId/:userId/getConversations?", auth, async (req, res) => {
           status: otherUser.status,
           photo: otherUser.photo,
           username: otherUser.userName,
-          lastSeen: otherUser.lastSeen
+          lastSeen: otherUser.lastSeen,
+          userId: otherUser._id,
+          isOnline: otherUser.isOnline
         }
         objConv.partnerInfos = otherUserInfos
         convsArr.push(objConv)

@@ -17,8 +17,9 @@ const getUsersSocketId = async (usersNameArr) => {
     return filteredUsersSockets
 }
 
+//Set user offline
 const setUserOffline = async (socketId) => {
-    const user = await User.findOne({ socketId: socketId });
+    const user = await User.findOne({ socketId: socketId }).select("-messages");
     if (!user) {
         console.log("user non trouvé")
         return null;
@@ -26,9 +27,14 @@ const setUserOffline = async (socketId) => {
     user.isOnline = false;
     user.lastSeen = new Date();
     user.socketId = "";
-    console.log(user)
     await user.save();
-    return user.userName;
+    console.log(user)
+    return {
+        isOnline: user.isOnline,
+        username: user.userName,
+        userId: user._id,
+        lastSeen: user.lastSeen
+    };
 }
 
 
