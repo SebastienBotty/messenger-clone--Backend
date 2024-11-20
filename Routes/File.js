@@ -5,7 +5,10 @@ require("dotenv").config();
 const { auth } = require("../Middlewares/authentication");
 const Conversation = require("../Models/Conversation");
 const File = require("../Models/File");
+const ProfilePic = require("../Models/ProfilePic");
+const User = require("../Models/User");
 const s3 = require('../Config/S3')
+const { getUserProfilePicUrl } = require('../Services/User')
 const APIUrl = process.env.API_URL
 
 
@@ -17,7 +20,7 @@ const upload = multer({
   storage: storage,
 });
 //----------------------------------------------------------POST
-// Route to upload files from frontend
+// Route to upload files in a conversation
 router.post(
   "/upload/:conversationId",
   auth,
@@ -60,12 +63,68 @@ router.post(
       res.status(200).json({ fileNames: fileNamesArr });
       console.log('res')
     } catch (err) {
+      f
       console.error("Error uploading files to S3:", err);
       res.status(500).send("Failed to upload files.");
     }
   }
 );
 
+//Post Profile picture
+router.post('/profilePic/:userId', auth, upload.single('profilePic'), async (req, res) => {
+  const userId = req.params.userId;
+  const file = req.file;
+  const timeStamp = Date.now();
+
+  if (userId !== req.user.userId) return res.status(403).json({ message: "Access denied. You're not who you pretend to be." });
+  if (file.size > 5 * 1024 * 1024) return res.status(400).json({ message: "Image size must be less than 5MB" });
+  if (!userId || !file) return res.status(400).json({ message: "All fields are required" });
+
+  const user = await User.findById(userId).select("userName");
+  if (!user) return res.status(404).json({ message: "User not found" });
+
+  const username = user.userName
+  console.log(username)
+
+  const params = {
+    Bucket: bucketName,
+    Key: `/users/${userId}/profilePic/${timeStamp}-${file.originalname}`,
+    Body: file.buffer,
+    ContentType: file.mimetype,
+  };
+  const session = await ProfilePic.startSession()
+  try {
+    await s3.upload(params).promise();
+    session.startTransaction();
+    const newProfilePic = new ProfilePic({
+      userId: userId,
+      username: username,
+      pathName: `/users/${userId}/profilePic/${timeStamp}-${file.originalname}`,
+      lastModified: timeStamp,
+      size: file.size,
+    });
+
+    await newProfilePic.save({ session });
+
+    const user = await User.findOne({ _id: userId });
+    if (!user) throw new Error(`User not found: ${userId}`);
+
+    user.photo = `/users/${userId}/profilePic/${timeStamp}-${file.originalname}`;
+    await user.save({ session });
+    await session.commitTransaction();
+
+    const signedUrl = await getUserProfilePicUrl(userId)
+    res.status(200).json({ image: signedUrl });
+  } catch (err) {
+    console.error("Error uploading files to S3:", err);
+    session.abortTransaction();
+    res.status(500).json({ message: err.message });
+  } finally {
+    session.endSession()
+  }
+});
+
+//Transfer image from a conversation to another
 router.post("/userId/:userId/transferImage", auth, async (req, res) => {
   const userId = req.params.userId;
   const sender = req.body.sender

@@ -5,7 +5,8 @@ const Conversation = require("../Models/Conversation");
 const jwt = require("jsonwebtoken");
 const { auth, authAdmin } = require("../Middlewares/authentication");
 const { emitStatusChangeToUsers, emitUserOnlineStatus } = require("../Utils/SocketUtils");
-const { getIo } = require('../Config/Socket')
+const { getIo } = require('../Config/Socket');
+const { getUserProfilePicUrl } = require("../Services/User");
 require("dotenv").config();
 
 //-------------------------POST
@@ -54,9 +55,14 @@ router.get("/username?", auth, async (req, res) => {
           $nin: exceptions
         }
       }).select("-conversations");
-
+      let usersWithImg = []
+      for (const user of users) {
+        const userObj = user.toObject()
+        userObj.photo = await getUserProfilePicUrl(user._id);
+        usersWithImg.push(userObj)
+      }
       //console.log("exceptions")
-      return res.json(users);
+      return res.status(200).json(usersWithImg);
     }
 
 
@@ -64,7 +70,14 @@ router.get("/username?", auth, async (req, res) => {
       userName: { $regex: `.*${searchQuery}.*`, $options: "i" },
     }).select("-conversations");
     //console.log('non exceptions')
-    res.json(users);
+    let usersWithImg = []
+    for (const user of users) {
+      const userObj = user.toObject()
+      userObj.photo = await getUserProfilePicUrl(user._id);
+      usersWithImg.push(userObj)
+    }
+    //console.log("exceptions")
+    return res.status(200).json(usersWithImg);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -77,7 +90,10 @@ router.get("/mail/:mail", async (req, res) => {
   try {
     const user = await User.findOne({ mail: { $regex: new RegExp(`^${mail}$`, "i") } });
     const token = jwt.sign(String(user._id), process.env.JWT_SECRET);
-    res.status(200).json([user, { ApiToken: token }]);
+    const userObj = user.toObject()
+    userObj.photo = await getUserProfilePicUrl(user._id);
+    console.log(userObj)
+    res.status(200).json([userObj, { ApiToken: token }]);
 
   } catch (error) {
     res.status(400).json({ message: error.message });
