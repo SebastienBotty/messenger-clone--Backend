@@ -16,15 +16,14 @@ router.post("/", auth, checkPostConvBody, async (req, res) => {
   const members = req.body.members;
   const creationDate = req.body.creationDate;
   const admin = req.body.admin;
-
   const user = await User.findOne({ userName: admin }).select("_id");
   if (!user) {
-    return res.status(400).send("User not found");
+    return res.status(400).json({ message: "User not found" });
   }
   if (String(user._id) !== req.user.userId) {
     return res
       .status(403)
-      .send("You can't create a conversation for someone else");
+      .json({ message: "You can't create a conversation for someone else" });
   }
 
   const isGroupConversation = members.length > 2; //If there is more than 2 members when conversatoin is created, it is flagged as a group Conversation. Then the admin is the one who created the conversation
@@ -36,19 +35,26 @@ router.post("/", auth, checkPostConvBody, async (req, res) => {
     messages: [],
     creationDate: creationDate,
     removedMembers: [],
+    mutedBy: [],
   });
+  console.log('1')
   try {
     const newConversation = await conversation.save();
+    console.log('"2')
     for (let member of members) {
       const user = await User.findOne({
         userName: new RegExp("^" + member + "$", "i"),
       });
       if (user) {
         user.conversations.push(newConversation._id);
+        console.log(user.userName + " trouver")
         await user.save();
+      } else {
+        console.log(user + " pas trouvé")
+        return res.status(400).json({ message: "User member not found" });
       }
     }
-
+    console.log('"3')
     res.status(201).json(newConversation);
   } catch (error) {
     res.status(400).json({ message: error.message });
