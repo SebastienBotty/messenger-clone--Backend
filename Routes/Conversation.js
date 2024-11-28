@@ -778,6 +778,72 @@ router.patch("/changeEmoji", auth, async (req, res) => {
   }
 })
 
+//PATCH conversation mutedBy : Add a user to the mutedBy array
+
+router.patch("/muteConversation", auth, async (req, res) => {
+  const { conversationId, mutedByUsername, userId, untilMuteDate } = req.body;
+
+  if (!conversationId || !mutedByUsername || !userId || !untilMuteDate) return res.status(400).json({ message: "All fields are required" });
+
+  if (req.user.userId !== userId) return res.status(403).json({ message: "Access denied." });
+
+  const user = await User.findById(userId).select("userName");
+  if (!user) return res.status(404).json({ message: "User not found" });
+  if (user.userName !== mutedByUsername) return res.status(400).json({ message: "Error: Muted user must be the same as the user who sent the request" });
+
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+  if (!conversation.members.includes(mutedByUsername)) return res.status(400).json({ message: "User is not a member of this conversation" });
+
+  if (conversation.mutedBy.some(member => member.userId === userId)) {
+    conversation.mutedBy.filter(member => member.userId !== userId);
+  }
+
+  conversation.mutedBy.push({
+    userId: userId,
+    untilDate: new Date(untilMuteDate)
+  });
+
+  try {
+    await conversation.save();
+    res.status(200).json({ userId: userId, untilDate: new Date(untilMuteDate) });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+})
+
+//PATCH conversation mutedBy : Remove a user from the mutedBy array
+router.patch("/unmuteConversation", auth, async (req, res) => {
+  const { conversationId, unmutedByUsername, userId } = req.body;
+
+  if (!conversationId || !unmutedByUsername || !userId) return res.status(400).json({ message: "All fields are required" });
+
+  if (req.user.userId !== userId) return res.status(403).json({ message: "Access denied." });
+
+  const user = await User.findById(userId).select("userName");
+  if (!user) return res.status(404).json({ message: "User not found" });
+  if (user.userName !== unmutedByUsername) return res.status(400).json({ message: "Error: Unmuted user must be the same as the user who sent the request" });
+
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+  if (!conversation.members.includes(unmutedByUsername)) return res.status(400).json({ message: "User is not a member of this conversation" });
+
+  if (conversation.mutedBy.some(member => member.userId === userId)) {
+    console.log(conversation.mutedBy)
+    conversation.mutedBy = conversation.mutedBy.filter(member => member.userId !== userId);
+    console.log(conversation.mutedBy)
+
+  } else return res.status(400).json({ message: "User is not muted in this conversation" });
+
+
+  try {
+    await conversation.save();
+    res.status(200).json({ userId: userId });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+})
+
 
 
 module.exports = router;
