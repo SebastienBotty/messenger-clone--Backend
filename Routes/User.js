@@ -16,6 +16,7 @@ router.post("/", async (req, res) => {
     mail: mail,
     userName: userName,
     conversations: [],
+    mutedConversations: [],
     socketId: "",
     photo: "",
     lastSeen: new Date(),
@@ -238,6 +239,57 @@ router.patch("/:userId/changeStatus", auth, async (req, res) => {
   }
 })
 
+
+//PATCH user mutedConversations - Add a conversation to the mutedConversations array
+router.patch("/userId/:userId/muteConversation", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const conversationId = req.body.conversationId;
+  const untilDate = req.body.untilDate;
+
+  if (req.user.userId !== userId) {
+    return res.status(403).json({ message: "Access denied." });
+  }
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const conversation = user.mutedConversations.find(
+      conv => conv.conversationId === conversationId
+    );
+    if (conversation) {
+      conversation.untilDate = untilDate;
+    } else {
+      user.mutedConversations.push({ conversationId, untilDate });
+    }
+
+    await user.save();
+    res.status(200).json({ message: "Conversation muted" });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+
+//PATCH user mutedConversations - Remove a conversation from the mutedConversations array
+router.patch("/userId/:userId/unmuteConversation", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const conversationId = req.body.conversationId;
+  if (req.user.userId !== userId) {
+    return res.status(403).json({ message: "Access denied." });
+  }
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    user.mutedConversations = user.mutedConversations.filter(
+      (muted) => muted.conversationId !== conversationId
+    );
+    await user.save();
+    res.status(200).json({ message: "Conversation unmuted" });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+})
 
 
 module.exports = router;

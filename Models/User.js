@@ -19,6 +19,10 @@ const userSchema = Schema({
     type: String,
   },
   conversations: [String], // Array of ConversationId
+  mutedConversations: [{
+    conversationId: String,
+    untilDate: Date
+  }],
   isOnline: {
     type: Boolean,
     default: true

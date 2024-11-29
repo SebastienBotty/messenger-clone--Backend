@@ -20,16 +20,6 @@ const conversationSchema = Schema({
       require: true
     }
   }],
-  mutedBy: [{
-    userId: {
-      type: String,
-      require: true
-    },
-    untilDate: {
-      type: Date,
-      require: true
-    }
-  }],
   customization: {
     conversationName: {
       type: String,

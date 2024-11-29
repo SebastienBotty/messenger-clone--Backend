@@ -35,7 +35,6 @@ router.post("/", auth, checkPostConvBody, async (req, res) => {
     messages: [],
     creationDate: creationDate,
     removedMembers: [],
-    mutedBy: [],
   });
   console.log('1')
   try {
@@ -778,7 +777,7 @@ router.patch("/changeEmoji", auth, async (req, res) => {
   }
 })
 
-//PATCH conversation mutedBy : Add a user to the mutedBy array
+/* //PATCH conversation mutedBy : Add a user to the mutedBy array
 
 router.patch("/muteConversation", auth, async (req, res) => {
   const { conversationId, mutedByUsername, userId, untilMuteDate } = req.body;
@@ -842,7 +841,7 @@ router.patch("/unmuteConversation", auth, async (req, res) => {
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
-})
+}) */
 
 
 
