@@ -17,6 +17,7 @@ router.post("/", async (req, res) => {
     userName: userName,
     conversations: [],
     mutedConversations: [],
+    deletedConversations: [],
     socketId: "",
     photo: "",
     lastSeen: new Date(),
@@ -286,6 +287,28 @@ router.patch("/userId/:userId/unmuteConversation", auth, async (req, res) => {
     );
     await user.save();
     res.status(200).json({ message: "Conversation unmuted" });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+})
+
+//PATCH DELETE CONVERSATION => remove conversation from conversations array and add to deletedConversations array
+router.patch("/userId/:userId/deleteConversation", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const conversationId = req.body.conversationId;
+  const deleteDate = new Date(req.body.deleteDate)
+  if (req.user.userId !== userId) {
+    return res.status(403).json({ message: "Access denied." });
+  }
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    user.conversations = user.conversations.filter(
+      (conv) => conv.conversationId !== conversationId
+    );
+    user.deletedConversations.push({ conversationId, deleteDate });
+    await user.save();
+    res.status(200).json({ message: "Conversation deleted" });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

@@ -23,6 +23,10 @@ const userSchema = Schema({
     conversationId: String,
     untilDate: Date
   }],
+  deletedConversations: [{
+    conversationId: String,
+    deleteDate: Date
+  }],
   isOnline: {
     type: Boolean,
     default: true
