@@ -201,6 +201,8 @@ router.post("/userId/:userId/transferImage", auth, async (req, res) => {
     conversationId: targetConversationId,
   };
 
+
+  // Gotta modify this ugly code, learnt a better way since then
   try {
     const response = await fetch(
       `${APIUrl}/message/`,
@@ -301,6 +303,7 @@ router.get(
 
 
 //GET Recents  images of conversation with pagination of 18 images
+// Deleted conversation => returns only files more recent than deleteDate
 router.get('/userId/:userId/conversationId/:conversationId/getRecentFiles', async (req, res) => {
   const { start, fileType } = req.query;
   const { conversationId, userId } = req.params;
@@ -309,10 +312,32 @@ router.get('/userId/:userId/conversationId/:conversationId/getRecentFiles', asyn
     return res.status(400).json({ message: "Missing required parameters" });
   }
 
+  const user = await User.findById(userId).select("userName");
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  const convMembers = await Conversation.findById(conversationId);
+  if (!convMembers) {
+    return res.status(404).json({ message: "Conversation not found" });
+  }
+
+  if (!convMembers.members.includes(user.userName) && !convMembers.removedMembers.some((member) => member.username === user.userName)) {
+    return res.status(403).json({ message: "You are not a member of this conversation" });
+  }
+
   try {
+    const userDelConvs = await User.findById(userId).select("deletedConversations");
+    let deletedConv = userDelConvs.deletedConversations.find((conv) => conv.conversationId === conversationId)
+    const removedMember = convMembers.removedMembers.find((member) => member.username === user.userName)
+
     const files = await File.find({
       conversationId,
       type: fileType,
+      lastModified: {
+        $gte: deletedConv?.deleteDate || 0, ...(removedMember ? { $lte: new Date(removedMember.date) } : {})
+      }
+
     })
       .sort({ lastModified: -1 })
       .skip(start)
@@ -397,11 +422,46 @@ router.get("/listMediafiles", async (req, res) => {
 });
  */
 //GET all conversation images older ans newer than a given date
-router.get("/conversationId/:conversationId/getConversationImages", async (req, res) => {
+// Gotta improe this route now that i modified a few things but it works and im lazy
+router.get("/userId/:userId/conversationId/:conversationId/getConversationImages", auth, async (req, res) => {
+  console.log("CALLED ICI CALLED ICI CALLED ICICALLED ICICALLED ICICALLED ICICALLED ICICALLED ICI")
 
+  const userId = req.params.userId
   const convId = req.params.conversationId;
   const fileName = req.query.fileName;
+  let removedMemberDate = undefined
+
   //console.log(convId, fileName)
+
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .json({ message: "Access denied. You're not who you pretend to be." });
+  }
+
+  if (!convId || !fileName) {
+    return res.status(400).json({ message: "Missing required parameters" });
+  }
+
+
+  const user = await User.findById(userId).select("userName");
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+  const conversation = await Conversation.findById(convId);
+  if (!conversation) {
+    return res.status(404).json({ message: "Conversation not found" });
+  }
+  if (!conversation.members.includes(user.userName) && !conversation.removedMembers.some(member => member.username === user.userName)) {
+    return res
+      .status(403)
+      .json({ message: "Access denied. You're not in this conversation." });
+  }
+
+  if (conversation.removedMembers.some(member => member.username === user.userName)) {
+    removedMemberDate = conversation.removedMembers.find(member => member.username === user.userName).date
+  }
+
 
   let continuationToken = null;
   let referenceDate = null;
@@ -413,6 +473,10 @@ router.get("/conversationId/:conversationId/getConversationImages", async (req, 
     Prefix: convId + '/Medias/',
   };
   try {
+    const userDelConvs = await User.findById(userId).select("deletedConversations");
+    let deletedConv = userDelConvs.deletedConversations.find((conv) => conv.conversationId === convId)
+
+
 
     do {
       const data = await s3.listObjectsV2(params).promise();
@@ -432,10 +496,10 @@ router.get("/conversationId/:conversationId/getConversationImages", async (req, 
       throw new Error(`Le fichier de référence ${referenceKey} n'a pas été trouvé dans le bucket.`);
     }
     continuationToken = null;
-
-    const olderFiles = await getOlderFiles(continuationToken, referenceDate, referenceKey, convId);
-    const newerFiles = await getNewerFiles(continuationToken, referenceDate, referenceKey, convId);
-    //console.log("7777777777777777777777777777777777777777777777777777777777")
+    console.log("666666666666666666666666666666666666666666")
+    const olderFiles = await getOlderFiles(continuationToken, referenceDate, referenceKey, convId, deletedConv?.deleteDate, removedMemberDate);
+    const newerFiles = await getNewerFiles(continuationToken, referenceDate, referenceKey, convId, deletedConv?.deleteDate, removedMemberDate);
+    console.log("7777777777777777777777777777777777777777777777777777777777")
     //console.log(fileName)
     files.push({ Key: convId + '/' + fileName })
     files.unshift(...olderFiles)
@@ -469,7 +533,9 @@ router.get("/conversationId/:conversationId/getConversationImages", async (req, 
 //-------------------------------------------------------------- Functions
 const maxFiles = 5;
 
-const getOlderFiles = async (continuationTkn, referenceDate, referenceKey, convId) => {
+const getOlderFiles = async (continuationTkn, referenceDate, referenceKey, convId, convDeleteDate = 0, removedMemberDate = new Date(8640000000000000)) => {
+  console.log("MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM")
+  console.log(convDeleteDate)
   let continuationToken = continuationTkn;
   let olderFiles = [];
 
@@ -484,7 +550,7 @@ const getOlderFiles = async (continuationTkn, referenceDate, referenceKey, convI
 
 
     olderFiles = olderFiles.concat(
-      data.Contents.filter(obj => isImage(obj.Key) && obj.LastModified <= referenceDate && obj.Key !== referenceKey)
+      data.Contents.filter(obj => isImage(obj.Key) && obj.LastModified <= referenceDate && obj.LastModified < removedMemberDate && obj.LastModified > convDeleteDate && obj.Key !== referenceKey)
     );
     olderFiles.sort((a, b) => b.LastModified - a.LastModified);
 
@@ -501,7 +567,7 @@ const getOlderFiles = async (continuationTkn, referenceDate, referenceKey, convI
 
   return olderFiles;
 }
-const getNewerFiles = async (continuationTkn, referenceDate, referenceKey, convId) => {
+const getNewerFiles = async (continuationTkn, referenceDate, referenceKey, convId, convDeleteDate = 0, removedMemberDate = new Date(8640000000000000)) => {
   let continuationToken = continuationTkn;
   let newerFiles = [];
 
@@ -516,7 +582,7 @@ const getNewerFiles = async (continuationTkn, referenceDate, referenceKey, convI
 
 
     newerFiles = newerFiles.concat(
-      data.Contents.filter(obj => isImage(obj.Key) && obj.LastModified >= referenceDate && obj.Key !== referenceKey)
+      data.Contents.filter(obj => isImage(obj.Key) && obj.LastModified >= referenceDate && obj.LastModified < removedMemberDate && obj.LastModified > convDeleteDate && obj.Key !== referenceKey)
     );
     newerFiles.sort((a, b) => a.LastModified - b.LastModified);
 
