@@ -60,6 +60,10 @@ router.get("/getAllMessages", authAdmin, async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 });
+
+
+
+
 //Get X messages of a conversation starting at a given Y index
 router.get(
   "/userId/:userId/getMessages",
@@ -87,47 +91,19 @@ router.get(
         .status(403)
         .json({ message: "Access denied. You're not in this conversation." });
     }
-    const deletedConv = user.deletedConversations.find((conv) => conv.conversationId === conversationId)
+    const deletedConversation = user.deletedConversations.find((conv) => conv.conversationId === conversationId)
     const removedMember = convMembers.removedMembers.find((member) => member.username === user.userName)
-    if (deletedConv) {
-      try {
-        const messages = await Message.find({
-          conversationId: conversationId,
-          date: {
-            $gte: new Date(deletedConv.deleteDate),
-            ...(removedMember ? { $lte: new Date(removedMember.date) } : {})
 
 
-          },
-        })
-          .sort({ date: -1 })
-          .skip(start)
-          .limit(limit);
-        return res.status(200).json(messages);
-
-      } catch (error) {
-        return res.status(400).json({ message: error.message });
-      }
-    }
-    if (removedMember) {
-      try {
-        const messages = await Message.find({
-          conversationId: conversationId,
-          date: { $lte: removedMember.date },
-        })
-          .sort({ date: -1 })
-          .skip(start)
-          .limit(limit);
-        return res.status(200).json(messages);
-
-      } catch (error) {
-        return res.status(400).json({ message: error.message });
-
-      }
-    }
 
     try {
-      const messages = await Message.find({ conversationId: conversationId })
+      const messages = await Message.find({
+        conversationId: conversationId,
+        date: {
+          $gte: new Date(deletedConversation?.deleteDate || 0),
+          ...(removedMember ? { $lte: new Date(removedMember.date) } : {})
+        },
+      })
         .sort({ date: -1 })
         .skip(start)
         .limit(limit);
@@ -190,7 +166,7 @@ router.get("/userId/:userId/searchMessages", auth, async (req, res) => {
   }
 
   try {
-    const user = await User.findById(userId).select("userName");
+    const user = await User.findById(userId).select("userName deletedConversations");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -199,31 +175,26 @@ router.get("/userId/:userId/searchMessages", auth, async (req, res) => {
     if (!conversation) {
       return res.status(404).json({ message: "Conversation not found" });
     }
+    const deletedConversation = user.deletedConversations.find(conv => conv.conversationId === convId);
+    const removedMember = conversation.removedMembers.find(member => member.username === user.userName);
 
-    if (!conversation.members.includes(user.userName) && !conversation.removedMembers.some(member => member.username === user.userName)) {
+    if (!conversation.members.includes(user.userName) && !removedMember) {
       return res
         .status(403)
         .json({ message: "Access denied. You're not in this conversation." });
     }
 
-    if (conversation.removedMembers.some(member => member.username === user.userName)) {
-      const messages = await Message.find({
-        conversationId: convId,
-        text: { $regex: new RegExp(word, "i") },
-        author: { $ne: "System/" + convId },
-        date: { $lte: conversation.removedMembers.find(member => member.username === user.userName).date },
-      });
-      return res.status(200).json(messages);
-    }
-
-
-
     const messages = await Message.find({
       conversationId: convId,
       text: { $regex: new RegExp(word, "i") },
       author: { $ne: "System/" + convId },
+      date: {
+        $gte: new Date(deletedConversation?.deleteDate || 0),
+        ...(removedMember ? { $lte: new Date(removedMember.date) } : {})
+      },
     });
-    res.status(200).json(messages);
+    return res.status(200).json(messages);
+
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
