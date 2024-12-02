@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const User = require("../Models/User");
 const Conversation = require("../Models/Conversation");
+const Message = require("../Models/Message");
 const jwt = require("jsonwebtoken");
 const { auth, authAdmin } = require("../Middlewares/authentication");
 const { emitStatusChangeToUsers, emitUserOnlineStatus } = require("../Utils/SocketUtils");
@@ -142,12 +143,53 @@ router.get("/userConversationsId/userId/:userId", auth, async (req, res) => {
     return res.status(403).send("Access denied.");
   }
   try {
-    const user = await User.find({ _id: userId }, "conversations");
-    res.status(200).json(user);
+    const userConvs = await User.find({ _id: userId }, "conversations deletedConversations");
+    /*   console.log("icicicicicicicicics")
+      console.log(userConvs) */
+    const convObj = userConvs[0].toObject();
+    /*   console.log("-----------------------------------------------------------------------------------------------------")
+      console.log(convObj.conversations) */
+    for (deletedConv of convObj.deletedConversations) {
+      const lastMsgConv = await Message.findOne({ conversationId: deletedConv.conversationId, date: { $gt: new Date(deletedConv.deleteDate) } })
+      /*  console.log(lastMsgConv) */
+      /*  console.log(deletedConv.deleteDate) */
+      if (!lastMsgConv) {
+        /*  console.log("TRUC DE CONV")
+         console.log(convObj.conversations) */
+        console.log("Pas de mg plus récent donc je retire de Conv")
+        /*   console.log(deletedConv.conversationId)
+          console.log(convObj.conversations) */
+        convObj.conversations = convObj.conversations.filter((convId) => convId !== deletedConv.conversationId)
+        /* console.log("xxxxxxxxx")
+        console.log(convObj.conversations) */
+      } else {
+        console.log("Msg plus récent donc je laisse")
+      }
+    }
+    delete convObj.deletedConversations
+    /*  console.log(convObj) */
+    res.status(200).json([convObj]);
   } catch (error) {
     res.status(400).json({ mesage: error.message });
   }
 });
+
+/*// Get user's conversations based on his user ID
+router.get("/userConversationsId/userId/:userId", auth, async (req, res) => {
+  const userId = req.params.userId;
+
+  if (req.user.userId !== userId) {
+    return res.status(403).send("Access denied.");
+  }
+  try {
+    const user = await User.find({ _id: userId }, "conversations");
+    console.log("---------------------------------------------------------------------------------------------")
+    console.log(user)
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(400).json({ mesage: error.message });
+  }
+});*/
 
 
 //Get user SocketId
@@ -292,7 +334,7 @@ router.patch("/userId/:userId/unmuteConversation", auth, async (req, res) => {
   }
 })
 
-//PATCH DELETE CONVERSATION => remove conversation from conversations array and add to deletedConversations array
+//PATCH DELETE CONVERSATION => add conversation to deletedConversations array
 router.patch("/userId/:userId/deleteConversation", auth, async (req, res) => {
   const userId = req.params.userId;
   const conversationId = req.body.conversationId;
@@ -303,11 +345,13 @@ router.patch("/userId/:userId/deleteConversation", auth, async (req, res) => {
   try {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
-    user.conversations = user.conversations.filter(
-      (conv) => conv.conversationId !== conversationId
-    );
-    user.deletedConversations.push({ conversationId, deleteDate });
-    await user.save();
+    let deletedConv = user.deletedConversations.find((conv) => conv.conversationId === conversationId)
+    if (deletedConv) {
+      deletedConv.deleteDate = deleteDate;
+    } else {
+      user.deletedConversations.push({ conversationId, deleteDate });
+    }
+    await user.save()
     res.status(200).json({ message: "Conversation deleted" });
   } catch (error) {
     res.status(400).json({ message: error.message });
