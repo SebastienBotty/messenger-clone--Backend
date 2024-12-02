@@ -87,12 +87,18 @@ router.get(
         .status(403)
         .json({ message: "Access denied. You're not in this conversation." });
     }
-    let deletedConv = user.deletedConversations.find((conv) => conv.conversationId === conversationId)
+    const deletedConv = user.deletedConversations.find((conv) => conv.conversationId === conversationId)
+    const removedMember = convMembers.removedMembers.find((member) => member.username === user.userName)
     if (deletedConv) {
       try {
         const messages = await Message.find({
           conversationId: conversationId,
-          date: { $gte: new Date(deletedConv.deleteDate) },
+          date: {
+            $gte: new Date(deletedConv.deleteDate),
+            ...(removedMember ? { $lte: new Date(removedMember.date) } : {})
+
+
+          },
         })
           .sort({ date: -1 })
           .skip(start)
@@ -103,12 +109,11 @@ router.get(
         return res.status(400).json({ message: error.message });
       }
     }
-
-    if (convMembers.removedMembers.some((member) => member.username === user.userName)) {
+    if (removedMember) {
       try {
         const messages = await Message.find({
           conversationId: conversationId,
-          date: { $lte: convMembers.removedMembers.find((member) => member.username === user.userName).date },
+          date: { $lte: removedMember.date },
         })
           .sort({ date: -1 })
           .skip(start)
