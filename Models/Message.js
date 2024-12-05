@@ -13,6 +13,14 @@ const messageSchema = Schema({
     require: true,
   },
   seenBy: [String], //Array of people's userName who saw this msg
+  deletedBy: [{
+    username: String,
+    userId: String
+  }],
+  deletedForEveryone: {
+    type: Boolean,
+    default: false
+  },
   date: {
     //Date when message has been sent
     type: Date,

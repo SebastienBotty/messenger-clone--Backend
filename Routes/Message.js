@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Message = require("../Models/Message");
+const DeletedMessage = require("../Models/DeletedMessage");
 const Conversation = require("../Models/Conversation");
 const User = require("../Models/User");
 const { auth, authAdmin } = require("../Middlewares/authentication");
@@ -36,6 +37,8 @@ router.post("/", auth, checkPostMsgBody, async (req, res) => {
       seenBy: [author],
       date: new Date(date),
       conversationId: conversationId,
+      deletedBy: [],
+      deletedForEveryone: false
     });
     const newMessage = await message.save();
     const conversation = await Conversation.findByIdAndUpdate(conversationId, {
@@ -269,4 +272,111 @@ router.patch(
     }
   }
 );
+
+
+//Patch message deletedBy => Add a user to deletedBy arr 
+
+router.patch("/userId/:userId/markMessageAsDeletedByUser", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const messageId = req.body.messageId;
+  const username = req.body.username;
+  console.log(userId, messageId, username)
+  console.log("1")
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .json({ message: "Access denied. You're not who you pretend to be." });
+  }
+  try {
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    if (message.deletedBy.find((user) => user.userId === userId)) {
+      return res.status(400).json({ message: "Message already deleted" });
+    }
+
+    const conversation = await Conversation.findById(message.conversationId);
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+    if (!conversation.members.includes(username) && !conversation.removedMembers.find(member => member.username === username)) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. You're not in this conversation." });
+    }
+
+    message.deletedBy.push({ userId: userId, username: username });
+    await message.save();
+    return res.status(200).json({ message: "Message successfully deleted for user" });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+//PATCH message deletedForEveryone => put the field to true 
+
+router.patch("/userId/:userId/markMessageAsDeletedForEveryone", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const messageId = req.body.messageId;
+  const username = req.body.username;
+  console.log(userId, messageId, username)
+  console.log("1")
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .json({ message: "Access denied. You're not who you pretend to be." });
+  }
+
+  const session = await Conversation.startSession();
+
+  try {
+    session.startTransaction();
+    const message = await Message.findById(messageId).session(session);
+    if (!message) {
+      throw new Error("Message not found")
+    }
+
+    if (message.author !== username) {
+      throw new Error("Access denied. You're not who you pretend to be.")
+    }
+    if (message.deletedForEveryone) {
+      throw new Error("Message already deleted")
+    }
+
+    const conversation = await Conversation.findById(message.conversationId).session(session);
+    if (!conversation) {
+      throw new Error("Conversation not found")
+    }
+    if (!conversation.members.includes(username)) {
+      throw new Error("Access denied. You're not in this conversation.")
+    }
+
+
+    const newDeletedMsg = new DeletedMessage({
+      messageId: message._id,
+      author: message.author,
+      text: message.text,
+      seenBy: message.seenBy,
+      deletedBy: message.deletedBy,
+      deletedForEveryone: true,
+      date: message.date,
+      deletedDate: new Date()
+    })
+    const deletedMsg = await newDeletedMsg.save({ session });
+    message.deletedForEveryone = true;
+    message.text = "Ce message a été supprimé"
+    await message.save({ session });
+
+    await session.commitTransaction();
+
+    res.status(200).json({ message: "Message successfully deleted" });
+  } catch (error) {
+    await session.abortTransaction();
+    res.status(400).json({ message: error.message });
+  } finally {
+    session.endSession();
+  }
+});
 module.exports = router;
