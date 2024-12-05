@@ -106,6 +106,11 @@ router.get(
           $gte: new Date(deletedConversation?.deleteDate || 0),
           ...(removedMember ? { $lte: new Date(removedMember.date) } : {})
         },
+        deletedBy: {
+          $not: {
+            $elemMatch: { username: user.userName }
+          }
+        }
       })
         .sort({ date: -1 })
         .skip(start)
@@ -194,7 +199,12 @@ router.get("/userId/:userId/searchMessages", auth, async (req, res) => {
       date: {
         $gte: new Date(deletedConversation?.deleteDate || 0),
         ...(removedMember ? { $lte: new Date(removedMember.date) } : {})
-      },
+      }, deletedForEveryone: false,
+      deletedBy: {
+        $not: {
+          $elemMatch: { username: user.userName }
+        }
+      }
     });
     return res.status(200).json(messages);
 

@@ -168,14 +168,24 @@ router.get(
         }
         return res.status(200).json(lastMessage);
       }
-      const messagesId = conversation.messages
-      if (messagesId.length > 0) {
-        lastMsgId = messagesId[messagesId.length - 1];
+      const lastUndeletedMessage = await Message.findOne({
+        conversationId: conversationId,
+        deletedForEveryone: false,
+        deletedBy: {
+          $not: {
+            $elemMatch: { userId: userId }
+          }
+        }
+      }).sort({ date: -1 });
+      if (lastUndeletedMessage) {
 
-        const lastMessage = await Message.findById(lastMsgId);
-        res.status(200).json(lastMessage);
+        res.status(200).json(lastUndeletedMessage);
       } else {
-        res.status(404).json({ message: "No message in this conversation" });
+        const lastMessage = await Message.findOne({
+          conversationId: conversationId,
+        }).sort({ date: -1 });
+
+        res.status(200).json(lastMessage);
       }
     } catch (error) {
       res.status(400).json({ message: error.message });
