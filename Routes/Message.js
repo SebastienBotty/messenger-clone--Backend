@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { getIo } = require('../Config/Socket')
 const Message = require("../Models/Message");
 const DeletedMessage = require("../Models/DeletedMessage");
 const Conversation = require("../Models/Conversation");
@@ -10,6 +11,8 @@ const {
   checkGetMsgBody,
   checkPatchMsgBody,
 } = require("../Middlewares/Message");
+const { emitDeletedMsgToUsers } = require("../Utils/SocketUtils");
+const { getUsersSocketId } = require("../Services/User")
 
 //-------------------------------POST
 router.post("/", auth, checkPostMsgBody, async (req, res) => {
@@ -374,14 +377,19 @@ router.patch("/userId/:userId/markMessageAsDeletedForEveryone", auth, async (req
       date: message.date,
       deletedDate: new Date()
     })
-    const deletedMsg = await newDeletedMsg.save({ session });
+    await newDeletedMsg.save({ session });
+
     message.deletedForEveryone = true;
     message.text = "Ce message a été supprimé"
-    await message.save({ session });
+    const msg = await message.save({ session });
+
+    const usersTosend = [...conversation.members.filter(member => member !== username)] // remove the user who sent the request// Olg bug i still dont understand
+    const socketsIds = await getUsersSocketId(usersTosend);
+    emitDeletedMsgToUsers(getIo(), socketsIds, msg, conversation._id);
 
     await session.commitTransaction();
-
     res.status(200).json({ message: "Message successfully deleted" });
+
   } catch (error) {
     await session.abortTransaction();
     res.status(400).json({ message: error.message });
