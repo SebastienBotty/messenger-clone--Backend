@@ -136,7 +136,6 @@ router.get(
   async (req, res) => {
     const userId = req.params.userId;
     const conversationId = req.query.conversationId;
-    let lastMsgId;
 
     if (req.user.userId !== userId) {
       return res.status(403).send("Access denied.");
@@ -170,7 +169,6 @@ router.get(
       }
       const lastUndeletedMessage = await Message.findOne({
         conversationId: conversationId,
-        deletedForEveryone: false,
         deletedBy: {
           $not: {
             $elemMatch: { userId: userId }
