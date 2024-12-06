@@ -380,6 +380,7 @@ router.patch("/userId/:userId/markMessageAsDeletedForEveryone", auth, async (req
     await newDeletedMsg.save({ session });
 
     message.deletedForEveryone = true;
+    message.deletedForEveryoneDate = new Date();
     message.text = "Ce message a été supprimé"
     const msg = await message.save({ session });
 

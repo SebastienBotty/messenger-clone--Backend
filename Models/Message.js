@@ -21,6 +21,10 @@ const messageSchema = Schema({
     type: Boolean,
     default: false
   },
+  deletedForEveryoneDate: {
+    type: Date,
+    default: null,
+  },
   date: {
     //Date when message has been sent
     type: Date,
