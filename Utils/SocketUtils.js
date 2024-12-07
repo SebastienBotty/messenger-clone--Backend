@@ -101,5 +101,21 @@ const emitDeletedMsgToUsers = (io, socketIdArr, message, conversationId) => {
   });
 
 }
+const emitChangeReactionToUsers = (io, socketIdArr, reactionsArr, messageId, conversationId) => {
+  socketIdArr.map((socketId) => {
+    if (socketId.socketId) {
+      io.to(socketId.socketId).emit("changeReaction", [reactionsArr, messageId, conversationId])
+    }
+  });
+}
 
-module.exports = { emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitConvUpdateToUsers, emitAdminChangeToUsers, emitNewFileToUsers, emitStatusChangeToUsers, emitUserOnlineStatus, emitDeletedMsgToUsers };
+const emitDeleteReactionToUsers = (io, socketIdArr, reactionsArr, messageId, conversationId) => {
+  socketIdArr.map((socketId) => {
+    if (socketId.socketId) {
+      io.to(socketId.socketId).emit("deleteReaction", [reactionsArr, messageId, conversationId])
+    }
+  });
+}
+
+
+module.exports = { emitChangeReactionToUsers, emitDeleteReactionToUsers, emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitConvUpdateToUsers, emitAdminChangeToUsers, emitNewFileToUsers, emitStatusChangeToUsers, emitUserOnlineStatus, emitDeletedMsgToUsers };

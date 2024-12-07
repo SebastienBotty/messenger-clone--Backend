@@ -11,7 +11,7 @@ const {
   checkGetMsgBody,
   checkPatchMsgBody,
 } = require("../Middlewares/Message");
-const { emitDeletedMsgToUsers } = require("../Utils/SocketUtils");
+const { emitDeletedMsgToUsers, emitChangeReactionToUsers, emitDeleteReactionToUsers } = require("../Utils/SocketUtils");
 const { getUsersSocketId } = require("../Services/User")
 
 //-------------------------------POST
@@ -41,7 +41,8 @@ router.post("/", auth, checkPostMsgBody, async (req, res) => {
       date: new Date(date),
       conversationId: conversationId,
       deletedBy: [],
-      deletedForEveryone: false
+      deletedForEveryone: false,
+      reactions: [],
     });
     const newMessage = await message.save();
     const conversation = await Conversation.findByIdAndUpdate(conversationId, {
@@ -398,4 +399,84 @@ router.patch("/userId/:userId/markMessageAsDeletedForEveryone", auth, async (req
     session.endSession();
   }
 });
+
+//Patch reactions add => Add/modifies/removes a user to reactions arr
+router.patch("/changeReaction", auth, async (req, res) => {
+  const userId = req.body.userId;
+  const messageId = req.body.messageId;
+  const username = req.body.username;
+  const reaction = req.body.reaction;
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .json({ message: "Access denied. You're not who you pretend to be." });
+  }
+  try {
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+    const conversation = await Conversation.findById(message.conversationId);
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+    if (!conversation.members.includes(username)) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. You're not in this conversation." });
+    }
+
+    const index = message.reactions.findIndex((user) => user.userId === userId);
+    if (index === -1) {
+      message.reactions.push({ userId: userId, username: username, reaction: reaction });
+    } else {
+      message.reactions[index].reaction = reaction;
+    }
+    await message.save();
+    res.status(200).json({ message: "Reaction successfully updated", data: message.reactions });
+    const usersTosend = [...conversation.members.filter(member => member !== username)] // remove the user who sent the request// Olg bug i still dont understand
+    const socketsIds = await getUsersSocketId(usersTosend);
+    emitChangeReactionToUsers(getIo(), socketsIds, message.reactions, message._id, conversation._id);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+})
+
+//Patch remove reaction => Remove a user from reactions arr
+router.patch("/removeReaction", auth, async (req, res) => {
+  const userId = req.body.userId;
+  const messageId = req.body.messageId;
+  const username = req.body.username;
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .json({ message: "Access denied. You're not who you pretend to be." });
+  }
+  try {
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+    const conversation = await Conversation.findById(message.conversationId);
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+    if (!conversation.members.includes(username)) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. You're not in this conversation." });
+    }
+
+    message.reactions = message.reactions.filter((user) => user.userId !== userId);
+
+    await message.save();
+    res.status(200).json({ message: "Reaction successfully deleted", data: message.reactions });
+
+    const usersTosend = [...conversation.members.filter(member => member !== username)] // remove the user who sent the request// Olg bug i still dont understand
+    const socketsIds = await getUsersSocketId(usersTosend);
+    emitChangeReactionToUsers(getIo(), socketsIds, message.reactions, message._id, conversation._id);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+})
 module.exports = router;
