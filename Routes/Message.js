@@ -376,7 +376,8 @@ router.patch("/userId/:userId/markMessageAsDeletedForEveryone", auth, async (req
       deletedBy: message.deletedBy,
       deletedForEveryone: true,
       date: message.date,
-      deletedDate: new Date()
+      deletedDate: new Date(),
+      reactions: message.reactions,
     })
     await newDeletedMsg.save({ session });
 

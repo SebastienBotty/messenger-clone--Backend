@@ -36,6 +36,11 @@ const deleteMessageSchema = Schema({
         type: Date,
         require: true,
     },
+    reactions: [{
+        username: String,
+        reaction: String,
+        userId: String
+    }]
 });
 
 module.exports = mongoose.model("DeletedMessages", deleteMessageSchema);
