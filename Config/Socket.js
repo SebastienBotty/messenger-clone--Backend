@@ -1,4 +1,5 @@
 const { Server } = require("socket.io");
+const jwt = require("jsonwebtoken");
 const {
     emitMsgToUsers,
     emitTypingToUsers,
@@ -16,6 +17,21 @@ const initSocket = (server) => {
         cors: {
             origin: "http://localhost:3001",
         },
+    });
+
+    io.use((socket, next) => {
+        const token = socket.handshake.auth.token;
+        if (!token) {
+            return next(new Error('Authentication error'));
+        }
+
+        jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+            if (err) {
+                return next(new Error('Authentication error'));
+            }
+            socket.data.user = decoded; // Stocker les infos utilisateur dans `socket.data`
+            next();
+        });
     });
 
     io.on("connection", (socket) => {

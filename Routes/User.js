@@ -104,7 +104,7 @@ router.get("/mail/:mail", loginLimiter, async (req, res) => {
     const userObj = user.toObject()
     userObj.photo = await getUserProfilePicUrl(user._id);
     console.log(userObj)
-    res.status(200).json([userObj, { ApiToken: token }]);
+    res.status(200).json([userObj, { apiToken: token }]);
 
   } catch (error) {
     res.status(400).json({ message: error.message });

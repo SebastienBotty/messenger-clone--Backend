@@ -83,13 +83,13 @@ const emitNewFileToUsers = (io, socketIdArr, data, conversation) => {
 }
 
 const emitStatusChangeToUsers = (io, userData) => {
-  if (!userData.socketId) return
+  if (!userData?.socketId) return
 
   io.except(userData.socketId).emit('changeStatus', { status: userData.status, lastSeen: userData.lastSeen, userId: userData.userId, username: userData.username });
 }
 
 const emitUserOnlineStatus = (io, userData) => {
-  if (!userData.socketId) return
+  if (!userData?.socketId) return
   io.except(userData.socketId).emit('isUserOnline', { isOnline: userData.isOnline, lastSeen: userData.lastSeen, userId: userData.userId, username: userData.username });
 }
 
