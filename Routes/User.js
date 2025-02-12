@@ -1,4 +1,5 @@
 const express = require("express");
+const rateLimite = require("express-rate-limit");
 const router = express.Router();
 const User = require("../Models/User");
 const Conversation = require("../Models/Conversation");
@@ -86,8 +87,15 @@ router.get("/username?", auth, async (req, res) => {
   }
 });
 
-//GET All user's info base on his email
-router.get("/mail/:mail", async (req, res) => {
+
+const loginLimiter = rateLimite.rateLimit({
+  windowMs: 1000, // 1 sec
+  max: 1, // 1 tentative max
+  message: 'Trop de tentatives, réessayez plus tard.',
+});
+
+//GET All user's info base on his email    -----------------------------------> TODO: modify this to a correct login with firebase
+router.get("/mail/:mail", loginLimiter, async (req, res) => {
   const mail = req.params.mail;
 
   try {
