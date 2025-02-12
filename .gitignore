@@ -1,1 +1,16 @@
+
+
+# Ignore les fichiers de log
+*.log
+
+# Ignore les dossiers générés
+node_modules/
+dist/
+coverage/
+
+# Ignore les fichiers de configuration locaux
 .env
+
+# Ignore les fichiers de sauvegarde des éditeurs
+.vscode/
+.idea/
