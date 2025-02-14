@@ -7,11 +7,11 @@ const messageSchema = Schema({
     type: String,
     require: true,
   },
-  text: {
-    //Message content
+  text: [{              //Message content, contains differents versions of modified msg
+
     type: String,
     require: true,
-  },
+  }],
   seenBy: [String], //Array of people's userName who saw this msg
   deletedBy: [{
     username: String,

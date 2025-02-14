@@ -480,4 +480,35 @@ router.patch("/removeReaction", auth, async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 })
+
+
+//PATCH : edit msg text 
+
+router.patch('/editMessage', async (req, res) => {
+  const userId = req.body.userId;
+  const messageId = req.body.messageId;
+  const username = req.body.username;
+  const text = req.body.text;
+
+  /*  if (userId !== req.user.userId) {
+     return res
+       .status(403)
+       .json({ message: "Access denied. You're not who you pretend to be." });
+   } */
+  try {
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+    if (message.author !== username) {
+      return res.status(403).json({ message: "Access denied. You're not the message author." });
+    }
+
+    message.text = [...message.text, text];
+    await message.save();
+    return res.status(200).json({ message: "Message successfully edited", data: message });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+})
 module.exports = router;
