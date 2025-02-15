@@ -12,11 +12,11 @@ const deleteMessageSchema = Schema({
         type: String,
         require: true,
     },
-    text: {
+    text: [{
         //Message content
         type: String,
         require: true,
-    },
+    }],
     seenBy: [String], //Array of people's userName who saw this msg
     deletedBy: [{
         username: String,

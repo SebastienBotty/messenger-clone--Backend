@@ -371,7 +371,7 @@ router.patch("/userId/:userId/markMessageAsDeletedForEveryone", auth, async (req
     const newDeletedMsg = new DeletedMessage({
       messageId: message._id,
       author: message.author,
-      text: message.text,
+      text: [...message.text],
       seenBy: message.seenBy,
       deletedBy: message.deletedBy,
       deletedForEveryone: true,
@@ -383,7 +383,7 @@ router.patch("/userId/:userId/markMessageAsDeletedForEveryone", auth, async (req
 
     message.deletedForEveryone = true;
     message.deletedForEveryoneDate = new Date();
-    message.text = "Ce message a été supprimé"
+    message.text = ["Ce message a été supprimé"]
     const msg = await message.save({ session });
 
     const usersTosend = [...conversation.members.filter(member => member !== username)] // remove the user who sent the request// Olg bug i still dont understand
@@ -484,17 +484,17 @@ router.patch("/removeReaction", auth, async (req, res) => {
 
 //PATCH : edit msg text 
 
-router.patch('/editMessage', async (req, res) => {
+router.patch('/editMessage', auth, async (req, res) => {
   const userId = req.body.userId;
   const messageId = req.body.messageId;
   const username = req.body.username;
   const text = req.body.text;
 
-  /*  if (userId !== req.user.userId) {
-     return res
-       .status(403)
-       .json({ message: "Access denied. You're not who you pretend to be." });
-   } */
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .json({ message: "Access denied. You're not who you pretend to be." });
+  }
   try {
     const message = await Message.findById(messageId);
     if (!message) {
@@ -506,7 +506,7 @@ router.patch('/editMessage', async (req, res) => {
 
     message.text = [...message.text, text];
     await message.save();
-    return res.status(200).json({ message: "Message successfully edited", data: message });
+    return res.status(200).json(message);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
