@@ -11,7 +11,7 @@ const {
   checkGetMsgBody,
   checkPatchMsgBody,
 } = require("../Middlewares/Message");
-const { emitDeletedMsgToUsers, emitChangeReactionToUsers, emitDeleteReactionToUsers } = require("../Utils/SocketUtils");
+const { emitDeletedMsgToUsers, emitChangeReactionToUsers, emitEditedMsgToUsers } = require("../Utils/SocketUtils");
 const { getUsersSocketId } = require("../Services/User")
 
 //-------------------------------POST
@@ -485,17 +485,23 @@ router.patch("/removeReaction", auth, async (req, res) => {
 //PATCH : edit msg text 
 
 router.patch('/editMessage', auth, async (req, res) => {
-  const userId = req.body.userId;
-  const messageId = req.body.messageId;
-  const username = req.body.username;
-  const text = req.body.text;
 
+  const { userId, messageId, username, text, conversationId } = req.body
   if (userId !== req.user.userId) {
     return res
       .status(403)
       .json({ message: "Access denied. You're not who you pretend to be." });
   }
   try {
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+    if (!conversation.members.includes(username)) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. You're not in this conversation." });
+    }
     const message = await Message.findById(messageId);
     if (!message) {
       return res.status(404).json({ message: "Message not found" });
@@ -506,7 +512,10 @@ router.patch('/editMessage', auth, async (req, res) => {
 
     message.text = [...message.text, text];
     await message.save();
-    return res.status(200).json(message);
+    res.status(200).json(message);
+    const usersTosend = [...conversation.members.filter(member => member !== username)] // remove the user who sent the request// Olg bug i still dont understand
+    const socketsIds = await getUsersSocketId(usersTosend);
+    emitEditedMsgToUsers(getIo(), socketsIds, message);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

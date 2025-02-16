@@ -117,5 +117,19 @@ const emitDeleteReactionToUsers = (io, socketIdArr, reactionsArr, messageId, con
   });
 }
 
+const emitEditedMsgToUsers = (io, socketIdArr, message) => {
+  socketIdArr.map((socketId) => {
+    if (socketId.socketId) {
+      io.to(socketId.socketId).emit("editedMessage", message)
+      console.log('emit msg to : ' + socketId.socketId)
+    }
+  });
+}
 
-module.exports = { emitChangeReactionToUsers, emitDeleteReactionToUsers, emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitConvUpdateToUsers, emitAdminChangeToUsers, emitNewFileToUsers, emitStatusChangeToUsers, emitUserOnlineStatus, emitDeletedMsgToUsers };
+
+module.exports = {
+  emitChangeReactionToUsers, emitDeleteReactionToUsers,
+  emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitConvUpdateToUsers,
+  emitAdminChangeToUsers, emitNewFileToUsers, emitStatusChangeToUsers, emitUserOnlineStatus,
+  emitDeletedMsgToUsers, emitEditedMsgToUsers
+};
