@@ -103,7 +103,7 @@ router.get("/mail/:mail", loginLimiter, async (req, res) => {
     const token = jwt.sign(String(user._id), process.env.JWT_SECRET);
     const userObj = user.toObject()
     userObj.photo = await getUserProfilePicUrl(user._id);
-    console.log(userObj)
+    //console.log(userObj)
     res.status(200).json([userObj, { apiToken: token }]);
 
   } catch (error) {
@@ -164,14 +164,14 @@ router.get("/userConversationsId/userId/:userId", auth, async (req, res) => {
       if (!lastMsgConv) {
         /*  console.log("TRUC DE CONV")
          console.log(convObj.conversations) */
-        console.log("Pas de mg plus récent donc je retire de Conv")
+        //console.log("Pas de mg plus récent donc je retire de Conv")
         /*   console.log(deletedConv.conversationId)
           console.log(convObj.conversations) */
         convObj.conversations = convObj.conversations.filter((convId) => convId !== deletedConv.conversationId)
         /* console.log("xxxxxxxxx")
         console.log(convObj.conversations) */
       } else {
-        console.log("Msg plus récent donc je laisse")
+        // console.log("Msg plus récent donc je laisse")
       }
     }
     delete convObj.deletedConversations
@@ -254,7 +254,7 @@ router.patch("/userId/:userId/socketId", auth, async (req, res) => {
     user.socketId = socketId;
     user.isOnline = true;
     if (user.status !== "Offline") user.lastSeen = new Date();
-    console.log(user)
+    //console.log(user)
     await user.save();
     const emitData = { username: user.userName, isOnline: user.isOnline, userId: user._id, lastSeen: user.lastSeen, socketId: user.socketId };
     emitUserOnlineStatus(getIo(), emitData);

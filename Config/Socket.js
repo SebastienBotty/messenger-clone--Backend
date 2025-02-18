@@ -8,7 +8,7 @@ const {
     emitAdminChangeToUsers,
     emitUserOnlineStatus
 } = require("../Utils/SocketUtils");
-const { setUserOffline } = require("../Services/User");
+const { setUserOnline, setUserOffline } = require("../Services/User");
 
 let io
 //------------------Web Socket
@@ -19,7 +19,7 @@ const initSocket = (server) => {
         },
     });
 
-    io.use((socket, next) => {
+    /* io.use((socket, next) => {
         const token = socket.handshake.auth.token;
         if (!token) {
             return next(new Error('Authentication error'));
@@ -32,10 +32,16 @@ const initSocket = (server) => {
             socket.data.user = decoded; // Stocker les infos utilisateur dans `socket.data`
             next();
         });
-    });
+    }); */
 
     io.on("connection", (socket) => {
         console.log(socket.id + " connected");
+        socket.on("userConnected", ({ socketId, userId }) => {
+            socket.userId = userId
+            console.log("USER CONNECTED");
+            console.log(socket.userId)
+            setUserOnline(getIo(), socketId, userId);
+        })
         //emitUserOnlineStatus()
         socket.on("typing", (data) => {
             // console.log(data);
@@ -60,7 +66,10 @@ const initSocket = (server) => {
 
         socket.on("disconnect", async () => {
             console.log(socket.id + " disconnected");
-            const user = await setUserOffline(socket.id);
+            console.log(socket.userId)
+            const user = await setUserOffline(socket.userId);
+            console.log("CHAHAHAHAH")
+            console.log(user)
             emitUserOnlineStatus(io, user);
         });
     });

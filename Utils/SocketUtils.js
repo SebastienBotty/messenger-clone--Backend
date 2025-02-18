@@ -89,7 +89,12 @@ const emitStatusChangeToUsers = (io, userData) => {
 }
 
 const emitUserOnlineStatus = (io, userData) => {
-  if (!userData?.socketId) return
+  if (!userData?.socketId) {
+    io.emit('isUserOnline', { isOnline: userData.isOnline, lastSeen: userData.lastSeen, userId: userData.userId, username: userData.username });
+    return
+  }
+  console.log('emitUserOnlineStatus')
+  console.log(userData)
   io.except(userData.socketId).emit('isUserOnline', { isOnline: userData.isOnline, lastSeen: userData.lastSeen, userId: userData.userId, username: userData.username });
 }
 

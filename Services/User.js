@@ -1,5 +1,7 @@
 const User = require("../Models/User");
 const s3 = require("../Config/S3")
+const { emitUserOnlineStatus } = require("../Utils/SocketUtils")
+const { getIo } = require('../Config/Socket');
 
 const bucketName = process.env.AWS_BUCKET_NAME;
 const getUsersSocketId = async (usersNameArr) => {
@@ -19,18 +21,43 @@ const getUsersSocketId = async (usersNameArr) => {
     return filteredUsersSockets
 }
 
+//Set User online
+
+const setUserOnline = async (io, socketId, userId) => {
+    try {
+        const user = await User.findById(userId).select("-messages");
+        if (!user) {
+            res.status(404).json({ message: "User not found" });
+        }
+        user.socketId = socketId;
+        user.isOnline = true;
+        if (user.status !== "Offline") user.lastSeen = new Date();
+        console.log("user online " + user.userName)
+        await user.save();
+        const emitData = { username: user.userName, isOnline: user.isOnline, userId: user._id, lastSeen: user.lastSeen, socketId: user.socketId };
+        console.log("xxx")
+        console.log(emitData)
+        emitUserOnlineStatus(io, emitData);
+        return true
+    } catch (error) {
+        console.error(error.message)
+        return false
+    }
+}
 //Set user offline
-const setUserOffline = async (socketId) => {
-    const user = await User.findOne({ socketId: socketId }).select("-messages");
+const setUserOffline = async (userId) => {
+    const user = await User.findById(userId).select("-messages");
     if (!user) {
         console.log("user non trouvé")
         return null;
     }
+
     user.isOnline = false;
     user.lastSeen = new Date();
     user.socketId = "";
     await user.save();
-    console.log(user)
+    console.log(user.userName + " offline")
+    console.log(user.isOnline)
     return {
         isOnline: user.isOnline,
         username: user.userName,
@@ -52,4 +79,4 @@ const getUserProfilePicUrl = async (userId) => {
 }
 
 
-module.exports = { getUsersSocketId, setUserOffline, getUserProfilePicUrl }
+module.exports = { getUsersSocketId, setUserOnline, setUserOffline, getUserProfilePicUrl }
