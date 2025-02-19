@@ -35,7 +35,12 @@ const messageSchema = Schema({
     userId: String,
     username: String,
     reaction: String
-  }]
+  }],
+  responseToMsgId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Messages",
+    default: null,
+  },
 });
 
 module.exports = mongoose.model("Messages", messageSchema);

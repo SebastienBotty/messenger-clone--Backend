@@ -13,6 +13,22 @@ const {
 } = require("../Middlewares/Message");
 const { emitDeletedMsgToUsers, emitChangeReactionToUsers, emitEditedMsgToUsers } = require("../Utils/SocketUtils");
 const { getUsersSocketId } = require("../Services/User")
+const test = async () => {
+  try {
+    const msgs = await Message.find({})
+    for (const msg of msgs) {
+      msg.responseToMsgId = "67b3c0b24bfc18ddd58a2c8f"
+      console.log(msg._id + " updated")
+      await msg.save()
+    }
+    console.log("succès")
+  } catch (error) {
+    console.log("error")
+    console.log(error)
+  }
+
+}
+
 
 //-------------------------------POST
 router.post("/", auth, checkPostMsgBody, async (req, res) => {
@@ -118,7 +134,12 @@ router.get(
       })
         .sort({ date: -1 })
         .skip(start)
-        .limit(limit);
+        .limit(limit)
+        .populate({
+          path: "responseToMsgId",
+          select: "author authorId text date ",
+        })
+
       res.status(200).json(messages);
     } catch (error) {
       res.status(400).json({ message: error.message });
@@ -236,14 +257,22 @@ router.get("/userId/:userId/getMessagesBeforeAndAfter", auth, async (req, res) =
       _id: { $lt: messageId },
     })
       .sort({ date: -1 })
-      .limit(10);
+      .limit(10)
+      .populate({
+        path: "responseToMsgId",
+        select: "author authorId text date ",
+      })
     messages[0] = messagesBefore;
     const messagesAfter = await Message.find({
       conversationId: conversationId,
       _id: { $gt: messageId },
     })
       .sort({ date: 1 })
-      .limit(10);
+      .limit(10)
+      .populate({
+        path: "responseToMsgId",
+        select: "author authorId text date ",
+      })
     messages[1] = messagesAfter;
     res.status(200).json(messages);
   } catch (error) {
