@@ -35,8 +35,8 @@ const setUserOnline = async (io, socketId, userId) => {
         console.log("user online " + user.userName)
         await user.save();
         const emitData = { username: user.userName, isOnline: user.isOnline, userId: user._id, lastSeen: user.lastSeen, socketId: user.socketId };
-        console.log("xxx")
-        console.log(emitData)
+        /* console.log("xxx")
+        console.log(emitData) */
         emitUserOnlineStatus(io, emitData);
         return true
     } catch (error) {

@@ -13,26 +13,11 @@ const {
 } = require("../Middlewares/Message");
 const { emitDeletedMsgToUsers, emitChangeReactionToUsers, emitEditedMsgToUsers } = require("../Utils/SocketUtils");
 const { getUsersSocketId } = require("../Services/User")
-const test = async () => {
-  try {
-    const msgs = await Message.find({})
-    for (const msg of msgs) {
-      msg.responseToMsgId = "67b3c0b24bfc18ddd58a2c8f"
-      console.log(msg._id + " updated")
-      await msg.save()
-    }
-    console.log("succès")
-  } catch (error) {
-    console.log("error")
-    console.log(error)
-  }
-
-}
 
 
 //-------------------------------POST
 router.post("/", auth, checkPostMsgBody, async (req, res) => {
-  const { author, authorId, text, date, conversationId } = req.body;
+  const { author, authorId, text, date, conversationId, responseToMsgId } = req.body;
 
   if (authorId !== req.user.userId) {
     return res
@@ -52,6 +37,7 @@ router.post("/", auth, checkPostMsgBody, async (req, res) => {
   try {
     const message = new Message({
       author: author,
+      authorId: authorId,
       text: text,
       seenBy: [author],
       date: new Date(date),
@@ -59,12 +45,17 @@ router.post("/", auth, checkPostMsgBody, async (req, res) => {
       deletedBy: [],
       deletedForEveryone: false,
       reactions: [],
+      responseToMsgId: responseToMsgId || null
     });
     const newMessage = await message.save();
     const conversation = await Conversation.findByIdAndUpdate(conversationId, {
       $push: { messages: newMessage._id },
     });
     await conversation.save();
+    await newMessage.populate({
+      path: "responseToMsgId",
+      select: "author authorId text date ",
+    })
     res.status(201).json(newMessage);
   } catch (error) {
     res.status(400).json({ message: error.message });
