@@ -7,6 +7,10 @@ const messageSchema = Schema({
     type: String,
     require: true,
   },
+  authorId: {
+    type: String,
+    require: true
+  },
   text: [{              //Message content, contains differents versions of modified msg
 
     type: String,
