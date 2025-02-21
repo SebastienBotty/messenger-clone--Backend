@@ -54,7 +54,7 @@ router.post("/", auth, checkPostMsgBody, async (req, res) => {
     await conversation.save();
     await newMessage.populate({
       path: "responseToMsgId",
-      select: "author authorId text date ",
+      select: "author authorId text date conversationId deletedBy",
     })
     res.status(201).json(newMessage);
   } catch (error) {
@@ -75,8 +75,39 @@ router.get("/getAllMessages", authAdmin, async (req, res) => {
   }
 });
 
+router.get("/userId/:userId/getMessageById", async (req, res) => {
+  console.log("getMessageById")
+  const userId = req.params.userId;
+  const messageId = req.query.messageId;
+  const conversationId = req.query.conversationId;
+  console.log(userId, messageId, conversationId)
 
+  /*  if (userId !== req.user.userId) {
+     return res
+       .status(403)
+       .json({ message: "Access denied. You're not who you pretend to be." });
+   } */
+  try {
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+    console.log("ICI")
 
+    const message = await Message.findById(messageId);
+    console.log(conversationId, message.conversationId)
+
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+    if (message.conversationId !== conversationId) {
+      return res.status(403).json({ message: "Access denied. You're not in this conversation." });
+    }
+    res.status(200).json(message);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
 
 //Get X messages of a conversation starting at a given Y index
 router.get(
@@ -128,7 +159,7 @@ router.get(
         .limit(limit)
         .populate({
           path: "responseToMsgId",
-          select: "author authorId text date ",
+          select: "author authorId text date conversationId deletedBy",
         })
 
       res.status(200).json(messages);
@@ -258,7 +289,7 @@ router.get("/userId/:userId/getMessagesBeforeAndAfter", auth, async (req, res) =
       .limit(10)
       .populate({
         path: "responseToMsgId",
-        select: "author authorId text date ",
+        select: "author authorId text date conversationId deletedBy",
       })
     messages[0] = messagesBefore;
     const messagesAfter = await Message.find({
@@ -269,7 +300,7 @@ router.get("/userId/:userId/getMessagesBeforeAndAfter", auth, async (req, res) =
       .limit(10)
       .populate({
         path: "responseToMsgId",
-        select: "author authorId text date ",
+        select: "author authorId text date conversationId deletedBy",
       })
     messages[1] = messagesAfter;
     res.status(200).json(messages);
