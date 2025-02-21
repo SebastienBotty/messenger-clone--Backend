@@ -210,18 +210,25 @@ router.get("/userId/:userId/searchMessages", auth, async (req, res) => {
 
     const messages = await Message.find({
       conversationId: convId,
-      text: { $regex: new RegExp(word, "i") },
+      $expr: {
+        $regexMatch: {
+          input: { $arrayElemAt: ["$text", -1] },
+          regex: new RegExp(word, "i")
+        }
+      },
       author: { $ne: "System/" + convId },
       date: {
         $gte: new Date(deletedConversation?.deleteDate || 0),
         ...(removedMember ? { $lte: new Date(removedMember.date) } : {})
-      }, deletedForEveryone: false,
+      },
+      deletedForEveryone: false,
       deletedBy: {
         $not: {
           $elemMatch: { username: user.userName }
         }
       }
     });
+    console.log(messages);
     return res.status(200).json(messages);
 
   } catch (error) {
