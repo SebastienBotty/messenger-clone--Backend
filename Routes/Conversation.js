@@ -10,6 +10,22 @@ const { getIo } = require('../Config/Socket') // Importer le serveur Socket.IO i
 const { emitConvUpdateToUsers } = require('../Utils/SocketUtils');
 const { getUsersSocketId } = require('../Services/User');
 
+/* const test = async () => {
+  try {
+    const users = await User.find({});
+    for (let user of users) {
+      user.conversations = []
+      await user.save()
+      console.log(user.userName + "done")
+    }
+    console.log('fone')
+  } catch (error) {
+    console.log(error)
+  }
+
+}
+
+test() */
 
 //----------------------POST---------------------------
 router.post("/", auth, checkPostConvBody, async (req, res) => {
@@ -28,16 +44,38 @@ router.post("/", auth, checkPostConvBody, async (req, res) => {
 
   const isGroupConversation = members.length > 2; //If there is more than 2 members when conversatoin is created, it is flagged as a group Conversation. Then the admin is the one who created the conversation
   //const admin = isGroupConversation ? req.body.admin : []; //If there is only 2, there's noe admin
-  const conversation = new Conversation({
-    isGroupConversation: isGroupConversation,
-    members: members,
-    admin: isGroupConversation ? [admin] : members,
-    messages: [],
-    creationDate: creationDate,
-    removedMembers: [],
-  });
-  console.log('1')
+
   try {
+    const membersData = []
+    for (let member of members) {
+      const user = await User.findOne({
+        userName: new RegExp("^" + member + "$", "i"),
+      });
+      if (!user) {
+        return res.status(404).json({ message: "User" + member + " not found" });
+      }
+      const memberData = {
+        userId: user._id,
+        username: user.userName,
+        nickname: "",
+        photo: user.photo,
+        status: user.status,
+        isOnline: user.isOnline
+      }
+/*       console.log(memberData);
+ */      membersData.push(memberData)
+    }
+
+    const conversation = new Conversation({
+      isGroupConversation: isGroupConversation,
+      members: membersData,
+      admin: isGroupConversation ? [admin] : membersData.map(member => member.username),
+      messages: [],
+      creationDate: creationDate,
+      removedMembers: [],
+    });
+    console.log('1')
+
     const newConversation = await conversation.save();
     console.log('"2')
     for (let member of members) {
@@ -50,7 +88,7 @@ router.post("/", auth, checkPostConvBody, async (req, res) => {
         await user.save();
       } else {
         console.log(user + " pas trouvé")
-        return res.status(400).json({ message: "User member not found" });
+        return res.status(404).json({ message: "User member not found" });
       }
     }
     console.log('"3')
@@ -88,7 +126,6 @@ router.get("/userId/:userId/getConversations?", auth, async (req, res) => {
   const userId = req.params.userId;
   const ids = req.query.conversationsId;
   const conversationsIds = ids.split("-").map((id) => id.trim());
-
   if (req.user.userId !== userId) {
     return res.status(403).send("Access denied.");
   }
@@ -96,15 +133,29 @@ router.get("/userId/:userId/getConversations?", auth, async (req, res) => {
 
   try {
     const user = await User.findById(userId);
+    /*     console.log("1")
+     */
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+/*       console.log("2")
+ */      return res.status(404).json({ message: "User not found" });
     }
     for (convId of conversationsIds) {
+      /*   console.log(convId)
+        console.log("0") */
       const conversation = await Conversation.findById(convId).select('-messages');
+      /*     console.log("4")
+          console.log(conversation) */
       if (!conversation.isGroupConversation) {
-        let objConv = conversation.toObject()
-        const otherUsername = conversation.members.find(member => member !== user.userName)
-        const otherUser = await User.findOne({ userName: otherUsername })
+/*         console.log("a")
+ */        let objConv = conversation.toObject()
+        const otherUsername = conversation.members.find(member => member.username !== user.userName)
+        /*  console.log("b")
+         console.log(otherUsername) */
+        const otherUser = await User.findOne({ userName: otherUsername.username })
+        /*  console.log("XXXXX")
+         console.log(otherUser)
+         console.log("XXXXX")
+         console.log("c") */
         otherUserInfos = {
           status: otherUser.status,
           photo: otherUser.photo,
@@ -113,12 +164,15 @@ router.get("/userId/:userId/getConversations?", auth, async (req, res) => {
           userId: otherUser._id,
           isOnline: otherUser.isOnline
         }
+        /*   console.log("d")
+          console.log(otherUserInfos) */
         objConv.partnerInfos = otherUserInfos
         convsArr.push(objConv)
-
-      } else {
+/*         console.log("5")
+ */      } else {
         convsArr.push(conversation)
-      }
+/*         console.log("x")
+ */      }
 
     }
 
@@ -150,7 +204,7 @@ router.get(
       if (!conversation) {
         return res.status(404).json({ message: "Conversation not found" });
       }
-      if (!conversation.members.includes(username.userName) && !conversation.removedMembers.some(member => member.username === username.userName)) {
+      if (!conversation.members.some(member => member.username === username.userName) && !conversation.removedMembers.some(member => member.username === username.userName)) {
         return res
           .status(403)
           .json({ message: "Access denied. You're not in this conversation." });
@@ -211,18 +265,24 @@ router.get("/userId/:userId/privateConversation?", auth, async (req, res) => {
     const user = await User.findOne({
       userName: new RegExp("^" + username, "i"),
     });
+    if (!user) {
+      console.log("USER NOT FOUND POUR IS PRIVATE CONV")
+      return res.status(404).json({ message: "User" + username + " not found" });
+    }
     const conversationsId = user.conversations;
     for (const conversationId of conversationsId) {
       const conversation = await Conversation.findById(conversationId);
       if (!conversation.isGroupConversation) {
         if (
-          conversation.members.includes(username) &&
-          conversation.members.includes(recipientUsername)
+          conversation.members.some(member => member.username === username) &&
+          conversation.members.some(member => member.username === recipientUsername)
         ) {
+          console.log("CONVEERSATOIN EXISTANTE")
           return res.json(conversation);
         }
       }
     }
+    console.log("PAS DE CONVEERSATOIN EXISTANTE")
     res.json(false);
   } catch (error) {
     res.status(400).json({ mesage: error.message });
@@ -235,7 +295,7 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
   const userId = req.params.userId;
   const members = req.query.members ? req.query.members.split(',') : [];
   const user = req.query.user ? req.query.user : '';
-
+  console.log(userId, members, user)
   if (!user) {
     return res.status(400).json({ message: "User query parameter is required and must not be empty." });
   }
@@ -335,6 +395,7 @@ router.patch("/addMembers", auth, async (req, res) => {
     for (const addedUser of addedUsers) {
       const addedUsername = addedUser.userName;
       const addedUserId = addedUser._id;
+      const addedUserPhoto = addedUser.photo;
 
       if (!addedUsername || !addedUserId) {
         throw new Error("All fields of addedUsers are required");
@@ -357,7 +418,7 @@ router.patch("/addMembers", auth, async (req, res) => {
       if (!conversation.admin.includes(adderUsername)) {
         throw new Error("You are not the admin of this conversation:");
       }
-      if (conversation.members.includes(addedUsername)) {
+      if (conversation.members.some(member => member.username === addedUsername)) {
         throw new Error(`User already in the conversation: ${addedUsername}`);
       }
 
@@ -367,13 +428,18 @@ router.patch("/addMembers", auth, async (req, res) => {
         conversation.removedMembers = conversation.removedMembers.filter(member => member.username !== addedUsername)
       }
 
-      conversation.members.push(addedUsername);
+      conversation.members.push({
+        userId: addedUserId,
+        username: addedUsername,
+        nickname: "",
+        photo: addedUserPhoto
+      });
     }
     conversation.messages.push(newMessage._id);
     await conversation.save({ session });
     const conversationObj = conversation.toObject();
     delete conversationObj.messages;
-    const usersTosend = [...conversation.members.filter(member => member !== adderUsername)] // remove the user who sent the request// !! Read commit message !
+    const usersTosend = conversation.members.filter(member => member.username !== adderUsername).map(member => member.username) // remove the user who sent the request// !! Read commit message !
     const socketsIds = await getUsersSocketId(usersTosend);
     conversationObj.lastMessage = newMessage
     emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);
@@ -416,14 +482,14 @@ router.patch("/removeUser", auth, async (req, res) => {
     if (conversation.admin.includes(removedUsername)) {
       throw new Error("You can't remove an admin of the conversation");
     }
-    if (!conversation.members.includes(removedUsername)) {
+    if (!conversation.members.some(member => member.username === removedUsername)) {
       throw new Error("User is not in the conversation");
     }
     if (!conversation.isGroupConversation) {
       throw new Error("You can't remove a user from a private conversation");
     }
 
-    conversation.members = conversation.members.filter(member => member !== removedUsername);
+    conversation.members = conversation.members.filter(member => member.username !== removedUsername);
     conversation.removedMembers.push({ username: removedUsername, date: new Date(date) });
     await conversation.save({ session });
 
@@ -442,7 +508,7 @@ router.patch("/removeUser", auth, async (req, res) => {
     const conversationObj = conversation.toObject();
     delete conversationObj.messages;
 
-    const usersTosend = [...conversation.members.filter(member => member !== removerUsername), removedUsername] // remove the user who sent the request// !! Read commit message !
+    const usersTosend = [...conversation.members.filter(member => member.username !== removerUsername).map(member => member.username), removedUsername] // remove the user who sent the request// !! Read commit message !
     const socketsIds = await getUsersSocketId(usersTosend);
     conversationObj.lastMessage = newMessage
     emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);
@@ -488,10 +554,10 @@ router.patch("/leaveConversation", auth, async (req, res) => {
       }
       conversation.admin = conversation.admin.filter(admin => admin !== username);
     }
-    if (!conversation.members.includes(username)) {
+    if (!conversation.members.some(member => member.username === username)) {
       throw new Error("User is not in the conversation");
     }
-    conversation.members = conversation.members.filter(member => member !== username);
+    conversation.members = conversation.members.filter(member => member.username !== username);
     conversation.removedMembers.push({ username: username, date: new Date(date) });
     await conversation.save({ session });
 
@@ -510,7 +576,7 @@ router.patch("/leaveConversation", auth, async (req, res) => {
 
     delete conversationObj.messages;
     conversationObj.lastMessage = newMessage
-    const usersTosend = [...conversation.members, username]
+    const usersTosend = [...conversation.members.map(member => member.username), username]
     const socketsIds = await getUsersSocketId(usersTosend);
     //console.log("LAAAALALALALALALALALALALALALA")
     emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);
@@ -653,7 +719,8 @@ router.patch("/changeConversationPhoto", auth, async (req, res) => {
     const conversationObj = conversation.toObject();
     delete conversationObj.messages;
 
-    const usersTosend = [...conversation.members.filter(member => member !== user.userName)]  // remove the user who sent the request// !! Read commit message !
+    const usersTosend = conversation.members.filter(member => member.username !== user.userName).map(member => member.username) // remove the user who sent the request// !! Read commit message !
+    console.log(usersTosend)
     const socketsIds = await getUsersSocketId(usersTosend);
     conversationObj.lastMessage = newMessage
     emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);
@@ -711,7 +778,8 @@ router.patch("/changeConversationName", auth, async (req, res) => {
     const conversationObj = conversation.toObject();
     delete conversationObj.messages;
 
-    const usersTosend = [...conversation.members.filter(member => member !== user.userName)]  // remove the user who sent the request// !! Read commit message !!
+    const usersTosend = conversation.members.filter(member => member.username !== user.userName).map(member => member.username) // remove the user who sent the request// !! Read commit message !!
+    console.log(usersTosend)
     const socketsIds = await getUsersSocketId(usersTosend);
     conversationObj.lastMessage = newMessage
     emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);
@@ -767,7 +835,7 @@ router.patch("/changeEmoji", auth, async (req, res) => {
     const conversationObj = conversation.toObject();
     delete conversationObj.messages;
 
-    const usersTosend = [...conversation.members.filter(member => member !== user.userName)]  // remove the user who sent the request// !! Read commit message !!
+    const usersTosend = conversation.members.filter(member => member.username !== user.userName).map(member => member.username) // remove the user who sent the request// !! Read commit message !
     const socketsIds = await getUsersSocketId(usersTosend);
     conversationObj.lastMessage = newMessage
     emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);

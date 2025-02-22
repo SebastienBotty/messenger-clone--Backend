@@ -48,7 +48,8 @@ const initSocket = (server) => {
             emitTypingToUsers(io, ...data);
         });
         socket.on("message", (data) => {
-
+            /* console.log("message")
+            console.log(data) */
             emitMsgToUsers(io, ...data);
         });
 

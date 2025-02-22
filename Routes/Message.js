@@ -28,7 +28,7 @@ router.post("/", auth, checkPostMsgBody, async (req, res) => {
     "members"
   );
 
-  if (!convMembers.members.includes(author)) {
+  if (!convMembers.members.some(member => member.username === author)) {
     return res
       .status(403)
       .json({ message: "Access denied. You're not in this conversation." });
@@ -131,7 +131,7 @@ router.get(
       return res.status(404).json({ message: "Conversation not found" });
     }
     const user = await User.findById(userId).select("userName deletedConversations");
-    if (!convMembers.members.includes(user.userName) && !convMembers.removedMembers.some((member) => member.username === user.userName)) {
+    if (!convMembers.members.some(member => member.username === user.userName) && !convMembers.removedMembers.some((member) => member.username === user.userName)) {
       return res
         .status(403)
         .json({ message: "Access denied. You're not in this conversation." });
@@ -233,7 +233,7 @@ router.get("/userId/:userId/searchMessages", auth, async (req, res) => {
     const deletedConversation = user.deletedConversations.find(conv => conv.conversationId === convId);
     const removedMember = conversation.removedMembers.find(member => member.username === user.userName);
 
-    if (!conversation.members.includes(user.userName) && !removedMember) {
+    if (!conversation.members.some(member => member.username === username.userName) && !removedMember) {
       return res
         .status(403)
         .json({ message: "Access denied. You're not in this conversation." });
@@ -373,7 +373,7 @@ router.patch("/userId/:userId/markMessageAsDeletedByUser", auth, async (req, res
     if (!conversation) {
       return res.status(404).json({ message: "Conversation not found" });
     }
-    if (!conversation.members.includes(username) && !conversation.removedMembers.find(member => member.username === username)) {
+    if (!conversation.members.some(member => member.username === username) && !conversation.removedMembers.find(member => member.username === username)) {
       return res
         .status(403)
         .json({ message: "Access denied. You're not in this conversation." });
@@ -421,7 +421,7 @@ router.patch("/userId/:userId/markMessageAsDeletedForEveryone", auth, async (req
     if (!conversation) {
       throw new Error("Conversation not found")
     }
-    if (!conversation.members.includes(username)) {
+    if (!conversation.members.some(member => member.username === username)) {
       throw new Error("Access denied. You're not in this conversation.")
     }
 
@@ -444,7 +444,7 @@ router.patch("/userId/:userId/markMessageAsDeletedForEveryone", auth, async (req
     message.text = ["Ce message a été supprimé"]
     const msg = await message.save({ session });
 
-    const usersTosend = [...conversation.members.filter(member => member !== username)] // remove the user who sent the request// Olg bug i still dont understand
+    const usersTosend = conversation.members.filter(member => member.username !== username).map(member => member.username) // remove the user who sent the request// Olg bug i still dont understand
     const socketsIds = await getUsersSocketId(usersTosend);
     emitDeletedMsgToUsers(getIo(), socketsIds, msg, conversation._id);
 
@@ -479,7 +479,7 @@ router.patch("/changeReaction", auth, async (req, res) => {
     if (!conversation) {
       return res.status(404).json({ message: "Conversation not found" });
     }
-    if (!conversation.members.includes(username)) {
+    if (!conversation.members.some(member => member.username === username)) {
       return res
         .status(403)
         .json({ message: "Access denied. You're not in this conversation." });
@@ -493,7 +493,7 @@ router.patch("/changeReaction", auth, async (req, res) => {
     }
     await message.save();
     res.status(200).json({ message: "Reaction successfully updated", data: message.reactions });
-    const usersTosend = [...conversation.members.filter(member => member !== username)] // remove the user who sent the request// Olg bug i still dont understand
+    const usersTosend = conversation.members.filter(member => member.username !== username).map(member => member.username) // remove the user who sent the request// Olg bug i still dont understand
     const socketsIds = await getUsersSocketId(usersTosend);
     emitChangeReactionToUsers(getIo(), socketsIds, message.reactions, message._id, conversation._id);
   } catch (error) {
@@ -520,7 +520,7 @@ router.patch("/removeReaction", auth, async (req, res) => {
     if (!conversation) {
       return res.status(404).json({ message: "Conversation not found" });
     }
-    if (!conversation.members.includes(username)) {
+    if (!conversation.members.some(member => member.username === username)) {
       return res
         .status(403)
         .json({ message: "Access denied. You're not in this conversation." });
@@ -531,7 +531,7 @@ router.patch("/removeReaction", auth, async (req, res) => {
     await message.save();
     res.status(200).json({ message: "Reaction successfully deleted", data: message.reactions });
 
-    const usersTosend = [...conversation.members.filter(member => member !== username)] // remove the user who sent the request// Olg bug i still dont understand
+    const usersTosend = conversation.members.filter(member => member.username !== username).map(member => member.username) // remove the user who sent the request// Olg bug i still dont understand
     const socketsIds = await getUsersSocketId(usersTosend);
     emitChangeReactionToUsers(getIo(), socketsIds, message.reactions, message._id, conversation._id);
   } catch (error) {
@@ -555,7 +555,7 @@ router.patch('/editMessage', auth, async (req, res) => {
     if (!conversation) {
       return res.status(404).json({ message: "Conversation not found" });
     }
-    if (!conversation.members.includes(username)) {
+    if (!conversation.members.some(member => member.username === username)) {
       return res
         .status(403)
         .json({ message: "Access denied. You're not in this conversation." });
@@ -571,7 +571,7 @@ router.patch('/editMessage', auth, async (req, res) => {
     message.text = [...message.text, text];
     await message.save();
     res.status(200).json(message);
-    const usersTosend = [...conversation.members.filter(member => member !== username)] // remove the user who sent the request// Olg bug i still dont understand
+    const usersTosend = conversation.members.filter(member => member.username !== username).map(member => member.username) // remove the user who sent the request// Olg bug i still dont understand
     const socketsIds = await getUsersSocketId(usersTosend);
     emitEditedMsgToUsers(getIo(), socketsIds, message);
   } catch (error) {

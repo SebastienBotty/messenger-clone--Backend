@@ -150,7 +150,7 @@ router.post("/userId/:userId/transferImage", auth, async (req, res) => {
     //console.log('Conversation non trouvée')
     return res.status(404).json({ message: "Conversation not found" });
   }
-  if (!conversationSource.members.some(member => new RegExp("^" + sender + "$", "i").test(member))) {
+  if (!conversationSource.members.some(member => new RegExp("^" + sender + "$", "i").test(member.username))) {
     //console.log('Membre pas dans la convo cible')
     return res.status(403).json({ message: "You are not a member of the source conversation" });
   }
@@ -160,7 +160,7 @@ router.post("/userId/:userId/transferImage", auth, async (req, res) => {
     return res.status(404).json({ message: "Conversation not found" });
   }
 
-  if (!conversationTarget.members.some(member => new RegExp("^" + sender + "$", "i").test(member))) {
+  if (!conversationTarget.members.some(member => new RegExp("^" + sender + "$", "i").test(member.username))) {
     return res.status(403).json({ message: "You are not a member of the target conversation" });
   }
 
@@ -322,7 +322,7 @@ router.get('/userId/:userId/conversationId/:conversationId/getRecentFiles', asyn
     return res.status(404).json({ message: "Conversation not found" });
   }
 
-  if (!convMembers.members.includes(user.userName) && !convMembers.removedMembers.some((member) => member.username === user.userName)) {
+  if (!convMembers.members.some(member => member.username === user.userName) && !convMembers.removedMembers.some((member) => member.username === user.userName)) {
     return res.status(403).json({ message: "You are not a member of this conversation" });
   }
 
@@ -452,7 +452,7 @@ router.get("/userId/:userId/conversationId/:conversationId/getConversationImages
   if (!conversation) {
     return res.status(404).json({ message: "Conversation not found" });
   }
-  if (!conversation.members.includes(user.userName) && !conversation.removedMembers.some(member => member.username === user.userName)) {
+  if (!conversation.members.some(member => member.username === user.userName) && !conversation.removedMembers.some(member => member.username === user.userName)) {
     return res
       .status(403)
       .json({ message: "Access denied. You're not in this conversation." });
