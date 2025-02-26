@@ -11,7 +11,8 @@ const conversationSchema = Schema({
     userId: {
       type: String,
       require: true
-    }, nickname: {
+    },
+    nickname: {
       type: String,
       default: ""
     },

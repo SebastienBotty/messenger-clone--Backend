@@ -853,6 +853,58 @@ router.patch("/changeEmoji", auth, async (req, res) => {
   }
 })
 
+router.patch("/changeNickname", auth, async (req, res) => {
+  const { conversationId, userId, userTargetId, nickname } = req.body;
+  if (!conversationId || !userId || !userTargetId || !nickname) return res.status(400).json({ message: "All fields are required" });
+
+  if (req.user.userId !== userId) return res.status(403).json({ message: "Access denied." });
+  const session = await Conversation.startSession();
+  try {
+    session.startTransaction();
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) return res.status(404).json({ message: "Conversation not found" });
+    if (!conversation.members.some(member => member.userId === userTargetId)) return res.status(400).json({ message: "UserTarget is not a member of this conversation" });
+    if (!conversation.members.some(member => member.userId === userId)) return res.status(400).json({ message: "User is not a member of this conversation" });
+
+    const user = conversation.members.find(member => member.userId === userId);
+    const userTargetUsername = conversation.members.find(member => member.userId === userTargetId).username;
+
+    const message = new Message({
+      conversationId: conversationId,
+      author: "System/" + conversationId,
+      text: `${user.username}-changeNickname-${userTargetUsername}-${nickname}`,
+      seenBy: [user.username],
+      date: new Date(),
+    })
+
+    const newMessage = await message.save({ session });
+
+    conversation.messages.push(newMessage._id);
+    conversation.members.find(member => member.userId === userTargetId).nickname = nickname;
+    await conversation.save({ session });
+
+
+
+    const conversationObj = conversation.toObject();
+    delete conversationObj.messages;
+    const usersTosend = conversation.members.filter(member => member.username !== user.username).map(member => member.username) // remove the user who sent the request// !! Read commit message !
+    const socketsIds = await getUsersSocketId(usersTosend);
+    conversationObj.lastMessage = newMessage
+    emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);
+    await session.commitTransaction();
+    console.log(conversationObj)
+    res.status(200).json({ conversation: conversationObj });
+
+  } catch (error) {
+    await session.abortTransaction();
+    res.status(400).json({ message: error.message });
+  } finally {
+    session.endSession();
+  }
+
+})
+
 /* //PATCH conversation mutedBy : Add a user to the mutedBy array
 
 router.patch("/muteConversation", auth, async (req, res) => {
