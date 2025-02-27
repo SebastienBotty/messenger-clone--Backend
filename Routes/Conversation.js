@@ -670,9 +670,7 @@ router.patch("/changeConversationPhoto", auth, async (req, res) => {
       return res.status(400).json({ message: "This is not a group conversation" });
     }
 
-    if (!conversation.admin.includes(user.userName)) {
-      return res.status(400).json({ message: "You are not an admin of this conversation" });
-    }
+
 
     conversation.customization.photo = photoStr;
     await conversation.save({ session });
@@ -731,7 +729,6 @@ router.patch("/changeConversationName", auth, async (req, res) => {
     const conversation = await Conversation.findById(conversationId).session(session);
     if (!conversation) throw new Error("Conversation not found");
     if (!conversation.isGroupConversation) throw new Error("This is not a group conversation")
-    if (!conversation.admin.includes(user.userName)) throw new Error("You are not an admin of this conversation")
 
     conversation.customization.conversationName = conversationName;
     await conversation.save({ session });
@@ -788,7 +785,6 @@ router.patch("/changeEmoji", auth, async (req, res) => {
 
     const conversation = await Conversation.findById(conversationId).session(session);
     if (!conversation) throw new Error("Conversation not found");
-    if (!conversation.admin.includes(user.userName)) throw new Error("You are not an admin of this conversation")
 
     conversation.customization.emoji = emoji;
     await conversation.save({ session });
