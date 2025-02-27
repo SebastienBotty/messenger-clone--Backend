@@ -8,7 +8,7 @@ const checkPostConvBody = require("../Middlewares/Conversation");
 
 const { getIo } = require('../Config/Socket') // Importer le serveur Socket.IO initialisé
 const { emitConvUpdateToUsers } = require('../Utils/SocketUtils');
-const { getUsersSocketId } = require('../Services/User');
+const { getUsersSocketId, getUserProfilePicUrlByPath } = require('../Services/User');
 
 /* const test = async () => {
   try {
@@ -140,39 +140,13 @@ router.get("/userId/:userId/getConversations?", auth, async (req, res) => {
  */      return res.status(404).json({ message: "User not found" });
     }
     for (convId of conversationsIds) {
-      /*   console.log(convId)
-        console.log("0") */
+
       const conversation = await Conversation.findById(convId).select('-messages');
-      /*     console.log("4")
-          console.log(conversation) */
-      if (!conversation.isGroupConversation) {
-/*         console.log("a")
- */        let objConv = conversation.toObject()
-        const otherUsername = conversation.members.find(member => member.username !== user.userName)
-        /*  console.log("b")
-         console.log(otherUsername) */
-        const otherUser = await User.findOne({ userName: otherUsername.username })
-        /*  console.log("XXXXX")
-         console.log(otherUser)
-         console.log("XXXXX")
-         console.log("c") */
-        otherUserInfos = {
-          status: otherUser.status,
-          photo: otherUser.photo,
-          username: otherUser.userName,
-          lastSeen: otherUser.lastSeen,
-          userId: otherUser._id,
-          isOnline: otherUser.isOnline
-        }
-        /*   console.log("d")
-          console.log(otherUserInfos) */
-        objConv.partnerInfos = otherUserInfos
-        convsArr.push(objConv)
-/*         console.log("5")
- */      } else {
-        convsArr.push(conversation)
-/*         console.log("x")
- */      }
+      const conversationObj = conversation.toObject();
+      for (const member of conversationObj.members) {
+        member.photo = member.photo ? await getUserProfilePicUrlByPath(member.photo) : ""
+      }
+      convsArr.push(conversationObj)
 
     }
 

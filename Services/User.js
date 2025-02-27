@@ -73,10 +73,18 @@ const getUserProfilePicUrl = async (userId) => {
         Bucket: bucketName,
         Key: photoPath.photo,
         ResponseContentDisposition: "attachment", // Indique au navigateur de télécharger le fichier plutôt que de l'afficher
-        Expires: 60 * 60 * 2
+        Expires: 60 * 60 * 24 * 7
     });
     return signedUrl
 }
 
-
-module.exports = { getUsersSocketId, setUserOnline, setUserOffline, getUserProfilePicUrl }
+const getUserProfilePicUrlByPath = async (path) => {
+    const signedUrl = s3.getSignedUrl("getObject", {
+        Bucket: bucketName,
+        Key: path,
+        ResponseContentDisposition: "attachment", // Indique au navigateur de télécharger le fichier plutôt que de l'afficher
+        Expires: 60 * 60 * 24 * 7
+    });
+    return signedUrl
+}
+module.exports = { getUsersSocketId, setUserOnline, setUserOffline, getUserProfilePicUrl, getUserProfilePicUrlByPath }
