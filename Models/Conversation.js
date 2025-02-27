@@ -27,6 +27,10 @@ const conversationSchema = Schema({
     isOnline: {
       type: Boolean,
       default: false
+    },
+    isTyping: {
+      type: Boolean,
+      default: false
     }
   }], //Array of usernames
   admin: [{ type: String, require: true }], //Array of username

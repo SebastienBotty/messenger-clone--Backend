@@ -31,11 +31,11 @@ const emitTypingToUsers = (
   if (!socketIdArr) return
   socketIdArr.map((socketId) => {
     if (socketId.socketId) {
-      io.to(socketId.socketId).emit("typing", [
+      io.to(socketId.socketId).emit("typing", {
         isWriting,
         writingUser,
         conversation,
-      ]);
+      });
     }
 
     // console.log("Message TYPING envoyé à " + socketId.userName);
