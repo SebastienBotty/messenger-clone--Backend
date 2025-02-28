@@ -196,7 +196,7 @@ router.post("/userId/:userId/transferImage", auth, async (req, res) => {
     author: sender,
     authorId: userId,
     text: "PATHIMAGE/" + copyImage,
-    seenBy: [sender],
+    seenBy: [{ username: sender, userId: userId, seenDate: new Date() }],
     date: date,
     conversationId: targetConversationId,
   };

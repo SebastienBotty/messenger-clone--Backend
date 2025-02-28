@@ -212,10 +212,11 @@ router.get("/getSockets?", auth, async (req, res) => {
       if (!user) {
         return null;
       }
-      return { userName: userName, socketId: user.socketId };
+      return { userName: userName, userId: user._id, socketId: user.socketId };
     })
   );
   const filteredUsersSockets = usersSockets.filter((socket) => socket !== null);
+  console.log(filteredUsersSockets);
   res.status(200).json(filteredUsersSockets);
 });
 

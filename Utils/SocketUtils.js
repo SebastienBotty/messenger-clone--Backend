@@ -42,10 +42,11 @@ const emitTypingToUsers = (
   });
 };
 
-const emitSeenMsgToUsers = (io, socketIdArr, message, conversation) => {
+const emitSeenMsgToUsers = (io, socketIdArr, message, conversation, userId) => {
+  console.log(socketIdArr);
   socketIdArr.map((socketId) => {
     if (socketId.socketId) {
-      io.to(socketId.socketId).emit("seenMessage", [message, conversation])
+      io.to(socketId.socketId).emit("seenMessage", { message, conversation, userId })
     }
     //console.log("Message  VU envoyé à " + socketId.userName);
   });

@@ -362,7 +362,7 @@ router.patch("/addMembers", auth, async (req, res) => {
       conversationId: conversationId,
       author: "System/" + conversationId,
       text: `${adderUsername}-addUser-${addedUsers.map(user => user.userName).join(",")}`,
-      seenBy: [adderUsername],
+      seenBy: [{ username: adderUsername, userId: adderUserId, seenDate: new Date() }],
       date: new Date(date),
     })
     const newMessage = await message.save({ session });
@@ -472,7 +472,7 @@ router.patch("/removeUser", auth, async (req, res) => {
       conversationId: conversationId,
       author: "System/" + conversationId,
       text: `${removerUsername}-removeUser-${removedUsername}`,
-      seenBy: [removerUsername],
+      seenBy: [{ username: removerUsername, userId: removerUserId, seenDate: new Date() }],
       date: new Date(date),
     })
 
@@ -679,7 +679,7 @@ router.patch("/changeConversationPhoto", auth, async (req, res) => {
       conversationId: conversationId,
       author: "System/" + conversationId,
       text: `${user.userName}-changeConversationPhoto`,
-      seenBy: [user.userName],
+      seenBy: [{ username: user.userName, userId: user._id, seenDate: new Date() }],
       date: new Date(date),
     })
 
@@ -737,7 +737,7 @@ router.patch("/changeConversationName", auth, async (req, res) => {
       conversationId: conversationId,
       author: "System/" + conversationId,
       text: `${user.userName}-changeConversationName-${conversationName}`,
-      seenBy: [user.userName],
+      seenBy: [{ username: user.userName, userId: user._id, seenDate: new Date() }],
       date: new Date(date),
     })
 
@@ -793,7 +793,7 @@ router.patch("/changeEmoji", auth, async (req, res) => {
       conversationId: conversationId,
       author: "System/" + conversationId,
       text: `${user.userName}-changeEmoji-${emoji}`,
-      seenBy: [user.userName],
+      seenBy: [{ username: user.userName, userId: user._id, seenDate: new Date() }],
       date: new Date(date),
     })
 
@@ -844,7 +844,7 @@ router.patch("/changeNickname", auth, async (req, res) => {
       conversationId: conversationId,
       author: "System/" + conversationId,
       text: `${user.username}-changeNickname-${userTargetUsername}-${nickname}`,
-      seenBy: [user.username],
+      seenBy: [{ username: user.userame, userId: user.userId, seenDate: new Date() }],
       date: new Date(),
     })
 

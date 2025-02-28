@@ -17,7 +17,20 @@ const deleteMessageSchema = Schema({
         type: String,
         require: true,
     }],
-    seenBy: [String], //Array of people's userName who saw this msg
+    seenBy: [{
+        username: {
+            type: String,
+            require: true
+        },
+        userId: {
+            type: String,
+            require: true
+        },
+        seenDate: {
+            type: Date,
+            require: true
+        }
+    }],
     deletedBy: [{
         username: String,
         userId: String

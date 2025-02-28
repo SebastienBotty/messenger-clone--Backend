@@ -14,7 +14,6 @@ const {
 const { emitDeletedMsgToUsers, emitChangeReactionToUsers, emitEditedMsgToUsers } = require("../Utils/SocketUtils");
 const { getUsersSocketId } = require("../Services/User")
 
-
 //-------------------------------POST
 router.post("/", auth, checkPostMsgBody, async (req, res) => {
   const { author, authorId, text, date, conversationId, responseToMsgId } = req.body;
@@ -39,7 +38,7 @@ router.post("/", auth, checkPostMsgBody, async (req, res) => {
       author: author,
       authorId: authorId,
       text: text,
-      seenBy: [author],
+      seenBy: [{ username: author, userId: authorId, seenDate: new Date() }],
       date: new Date(date),
       conversationId: conversationId,
       deletedBy: [],
@@ -180,7 +179,7 @@ router.get("/userId/:userId/getLastMsgSeenByUser", auth, async (req, res) => {
   }
   try {
     const lastMessageSeen = await Message.findOne({
-      seenBy: { $in: new RegExp("^" + username + "$", "i") },
+      "seenBy.username": { $in: new RegExp("^" + username + "$", "i") },
       conversationId: convId,
     }).sort({
       date: -1,
@@ -333,8 +332,8 @@ router.patch(
         return res.status(404).json({ message: "Message not found" });
       }
 
-      if (!message.seenBy.includes(username)) {
-        message.seenBy.push(username);
+      if (!message.seenBy.some(seenBy => seenBy.username === username)) {
+        message.seenBy.push({ username: username, userId: userId, seenDate: new Date() });
         await message.save();
         return res.status(200).json(message);
       }
