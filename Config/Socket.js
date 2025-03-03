@@ -67,10 +67,7 @@ const initSocket = (server) => {
 
         socket.on("disconnect", async () => {
             console.log(socket.id + " disconnected");
-            console.log(socket.userId)
             const user = await setUserOffline(socket.userId);
-            console.log("CHAHAHAHAH")
-            console.log(user)
             emitUserOnlineStatus(io, user);
         });
     });

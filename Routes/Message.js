@@ -12,7 +12,7 @@ const {
   checkPatchMsgBody,
 } = require("../Middlewares/Message");
 const { emitDeletedMsgToUsers, emitChangeReactionToUsers, emitEditedMsgToUsers } = require("../Utils/SocketUtils");
-const { getUsersSocketId } = require("../Services/User")
+const { getUsersSocketId, getUserProfilePicUrlByPath } = require("../Services/User")
 
 //-------------------------------POST
 router.post("/", auth, checkPostMsgBody, async (req, res) => {
@@ -199,7 +199,7 @@ router.get("/userId/:userId/searchMessages", auth, async (req, res) => {
   const userId = req.params.userId;
   const convId = req.query.conversation;
   const word = req.query.word;
-
+  console.log("test")
   //console.log(userId, convId, word);
   if (userId !== req.user.userId) {
     return res
@@ -221,6 +221,7 @@ router.get("/userId/:userId/searchMessages", auth, async (req, res) => {
 
   try {
     const user = await User.findById(userId).select("userName deletedConversations");
+
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -232,7 +233,7 @@ router.get("/userId/:userId/searchMessages", auth, async (req, res) => {
     const deletedConversation = user.deletedConversations.find(conv => conv.conversationId === convId);
     const removedMember = conversation.removedMembers.find(member => member.username === user.userName);
 
-    if (!conversation.members.some(member => member.username === username.userName) && !removedMember) {
+    if (!conversation.members.some(member => member.username === user.userName) && !removedMember) {
       return res
         .status(403)
         .json({ message: "Access denied. You're not in this conversation." });
@@ -258,8 +259,19 @@ router.get("/userId/:userId/searchMessages", auth, async (req, res) => {
         }
       }
     });
-    console.log(messages);
-    return res.status(200).json(messages);
+    let msgsAndAuthorPhoto = [];
+    if (messages.length > 0) {
+      for (const message of messages) {
+        const memberPhotoPath = await User.findById(message.authorId).select("photo");
+        if (memberPhotoPath.photo) {
+          const memberPhoto = await getUserProfilePicUrlByPath(memberPhotoPath.photo);
+          msgsAndAuthorPhoto.push({ message, memberPhoto });
+        } else {
+          msgsAndAuthorPhoto.push({ message, memberPhoto: "" });
+        }
+      }
+    }
+    return res.status(200).json(msgsAndAuthorPhoto);
 
   } catch (error) {
     res.status(400).json({ message: error.message });

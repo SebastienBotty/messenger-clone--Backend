@@ -43,7 +43,7 @@ const emitTypingToUsers = (
 };
 
 const emitSeenMsgToUsers = (io, socketIdArr, message, conversation, userId) => {
-  console.log(socketIdArr);
+  //console.log(socketIdArr);
   socketIdArr.map((socketId) => {
     if (socketId.socketId) {
       io.to(socketId.socketId).emit("seenMessage", { message, conversation, userId })
