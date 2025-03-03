@@ -132,10 +132,15 @@ const emitEditedMsgToUsers = (io, socketIdArr, message) => {
   });
 }
 
+const emitProfilPicUpdate = (io, userId, signedUrl) => {
+  io.emit('profilPicUpdate', { userId, picSrc: signedUrl })
+  console.log('emitting profil pic update')
+}
+
 
 module.exports = {
   emitChangeReactionToUsers, emitDeleteReactionToUsers,
   emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitConvUpdateToUsers,
   emitAdminChangeToUsers, emitNewFileToUsers, emitStatusChangeToUsers, emitUserOnlineStatus,
-  emitDeletedMsgToUsers, emitEditedMsgToUsers
+  emitDeletedMsgToUsers, emitEditedMsgToUsers, emitProfilPicUpdate
 };

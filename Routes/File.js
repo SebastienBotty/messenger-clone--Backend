@@ -10,7 +10,8 @@ const User = require("../Models/User");
 const s3 = require('../Config/S3')
 const { getUserProfilePicUrl } = require('../Services/User')
 const APIUrl = process.env.API_URL
-
+const { emitProfilPicUpdate } = require('../Utils/SocketUtils')
+const { getIo } = require('../Config/Socket')
 
 const bucketName = process.env.AWS_BUCKET_NAME;
 
@@ -114,6 +115,7 @@ router.post('/profilePic/:userId', auth, upload.single('profilePic'), async (req
     await session.commitTransaction();
 
     const signedUrl = await getUserProfilePicUrl(userId)
+    emitProfilPicUpdate(getIo(), userId, signedUrl)
     res.status(200).json({ image: signedUrl });
   } catch (err) {
     console.error("Error uploading files to S3:", err);

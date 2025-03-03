@@ -144,7 +144,8 @@ router.get("/userId/:userId/getConversations?", auth, async (req, res) => {
       const conversation = await Conversation.findById(convId).select('-messages');
       const conversationObj = conversation.toObject();
       for (const member of conversationObj.members) {
-        member.photo = member.photo ? await getUserProfilePicUrlByPath(member.photo) : ""
+        const userPhoto = await User.findById(member.userId).select("photo")        //Get the signed url of the profile picture, would be better by doing it with a populate but that would make me change the schema and adapt whole codebase
+        member.photo = userPhoto.photo ? await getUserProfilePicUrlByPath(userPhoto.photo) : ""
       }
       convsArr.push(conversationObj)
 
