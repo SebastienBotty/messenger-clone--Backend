@@ -565,7 +565,7 @@ router.patch("/leaveConversation", auth, async (req, res) => {
     const usersTosend = [...conversation.members.map(member => member.username), username]
     const socketsIds = await getUsersSocketId(usersTosend);
     //console.log("LAAAALALALALALALALALALALALALA")
-    emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);
+    emitRemoveMemberToUsers(getIo(), socketsIds, conversationObj, username);
 
     await session.commitTransaction();
 
