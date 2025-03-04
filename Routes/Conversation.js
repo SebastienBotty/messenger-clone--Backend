@@ -7,7 +7,7 @@ const { auth, authAdmin } = require("../Middlewares/authentication");
 const checkPostConvBody = require("../Middlewares/Conversation");
 
 const { getIo } = require('../Config/Socket') // Importer le serveur Socket.IO initialisé
-const { emitConvUpdateToUsers } = require('../Utils/SocketUtils');
+const { emitConvUpdateToUsers, emitAddMembersToUsers, emitRemoveMemberToUsers } = require('../Utils/SocketUtils');
 const { getUsersSocketId, getUserProfilePicUrlByPath } = require('../Services/User');
 
 /* const test = async () => {
@@ -367,10 +367,12 @@ router.patch("/addMembers", auth, async (req, res) => {
       date: new Date(date),
     })
     const newMessage = await message.save({ session });
+    let addedUsersArr = []
     for (const addedUser of addedUsers) {
       const addedUsername = addedUser.userName;
       const addedUserId = addedUser._id;
       const addedUserPhoto = addedUser.photo;
+
 
       if (!addedUsername || !addedUserId) {
         throw new Error("All fields of addedUsers are required");
@@ -402,13 +404,20 @@ router.patch("/addMembers", auth, async (req, res) => {
         //console.log(conversation.removedMembers)
         conversation.removedMembers = conversation.removedMembers.filter(member => member.username !== addedUsername)
       }
-
-      conversation.members.push({
+      const userObj = {
         userId: addedUserId,
         username: addedUsername,
         nickname: "",
+        status: addedUser.status,
+        isOnline: addedUser.isOnline,
+        lastSeen: addedUser.lastSeen,
+        isTyping: false,
         photo: addedUserPhoto
-      });
+      }
+      console.log("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+      console.log(addedUserPhoto)
+      conversation.members.push(userObj)
+      addedUsersArr.push(userObj)
     }
     conversation.messages.push(newMessage._id);
     await conversation.save({ session });
@@ -417,9 +426,11 @@ router.patch("/addMembers", auth, async (req, res) => {
     const usersTosend = conversation.members.filter(member => member.username !== adderUsername).map(member => member.username) // remove the user who sent the request// !! Read commit message !
     const socketsIds = await getUsersSocketId(usersTosend);
     conversationObj.lastMessage = newMessage
-    emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);
+
+    emitAddMembersToUsers(getIo(), socketsIds, conversationObj, addedUsersArr);
+
     await session.commitTransaction();
-    res.status(200).json({ conversation: conversationObj, message: newMessage });
+    res.status(200).json({ conversation: conversationObj, addedUsersArr });
 
   } catch (error) {
     await session.abortTransaction();
@@ -486,9 +497,9 @@ router.patch("/removeUser", auth, async (req, res) => {
     const usersTosend = [...conversation.members.filter(member => member.username !== removerUsername).map(member => member.username), removedUsername] // remove the user who sent the request// !! Read commit message !
     const socketsIds = await getUsersSocketId(usersTosend);
     conversationObj.lastMessage = newMessage
-    emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);
+    emitRemoveMemberToUsers(getIo(), socketsIds, conversationObj, removedUsername);
     await session.commitTransaction();
-    res.status(200).json({ conversation: conversationObj, message: newMessage });
+    res.status(200).json({ conversation: conversationObj, removedUsername });
 
   } catch (error) {
     await session.abortTransaction();
@@ -840,12 +851,14 @@ router.patch("/changeNickname", auth, async (req, res) => {
 
     const user = conversation.members.find(member => member.userId === userId);
     const userTargetUsername = conversation.members.find(member => member.userId === userTargetId).username;
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!userTargetUsername) return res.status(404).json({ message: "UserTarget not found" });
 
     const message = new Message({
       conversationId: conversationId,
       author: "System/" + conversationId,
       text: `${user.username}-changeNickname-${userTargetUsername}-${nickname}`,
-      seenBy: [{ username: user.userame, userId: user.userId, seenDate: new Date() }],
+      seenBy: [{ username: user.username, userId: user.userId, seenDate: new Date() }],
       date: new Date(),
     })
 
@@ -862,7 +875,7 @@ router.patch("/changeNickname", auth, async (req, res) => {
     const usersTosend = conversation.members.filter(member => member.username !== user.username).map(member => member.username) // remove the user who sent the request// !! Read commit message !
     const socketsIds = await getUsersSocketId(usersTosend);
     conversationObj.lastMessage = newMessage
-    emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);
+    emitConvUpdateToUsers(getIo(), socketsIds, conversationObj, "changeNickname", userTargetId, nickname);
     await session.commitTransaction();
     console.log(conversationObj)
     res.status(200).json({ conversation: conversationObj });

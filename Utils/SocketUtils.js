@@ -52,11 +52,11 @@ const emitSeenMsgToUsers = (io, socketIdArr, message, conversation, userId) => {
   });
 };
 
-const emitConvUpdateToUsers = (io, socketIdArr, conversation) => {
+const emitConvUpdateToUsers = (io, socketIdArr, conversation, actionName, actionTargetId, actionValue) => {
   //console.log(socketIdArr)
   socketIdArr.map((socketId) => {
     if (socketId.socketId) {
-      io.to(socketId.socketId).emit("convUpdate", conversation);
+      io.to(socketId.socketId).emit("convUpdate", { conversation, actionName, actionTargetId, actionValue });
       console.log("CONVERSATION UPDATE envoyé à " + socketId.userName);
     }
 
@@ -137,10 +137,26 @@ const emitProfilPicUpdate = (io, userId, signedUrl) => {
   console.log('emitting profil pic update')
 }
 
+const emitAddMembersToUsers = (io, socketIdArr, conversation, addedUsersArr) => {
+  socketIdArr.map((socketId) => {
+    if (socketId.socketId) {
+      io.to(socketId.socketId).emit("addMembers", { conversation, addedUsersArr })
+    }
+  });
+}
+
+const emitRemoveMemberToUsers = (io, socketIdArr, conversation, removedUsername) => {
+  socketIdArr.map((socketId) => {
+    if (socketId.socketId) {
+      io.to(socketId.socketId).emit("removeMember", { conversation, removedUsername })
+    }
+  });
+}
+
 
 module.exports = {
   emitChangeReactionToUsers, emitDeleteReactionToUsers,
   emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitConvUpdateToUsers,
   emitAdminChangeToUsers, emitNewFileToUsers, emitStatusChangeToUsers, emitUserOnlineStatus,
-  emitDeletedMsgToUsers, emitEditedMsgToUsers, emitProfilPicUpdate
+  emitDeletedMsgToUsers, emitEditedMsgToUsers, emitProfilPicUpdate, emitAddMembersToUsers, emitRemoveMemberToUsers
 };
