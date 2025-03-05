@@ -7,7 +7,7 @@ const { auth, authAdmin } = require("../Middlewares/authentication");
 const checkPostConvBody = require("../Middlewares/Conversation");
 
 const { getIo } = require('../Config/Socket') // Importer le serveur Socket.IO initialisé
-const { emitConvUpdateToUsers, emitAddMembersToUsers, emitRemoveMemberToUsers } = require('../Utils/SocketUtils');
+const { emitConvUpdateToUsers, emitAddMembersToUsers, emitRemoveMemberToUsers, emitChangeConvCustomizationToUsers } = require('../Utils/SocketUtils');
 const { getUsersSocketId, getUserProfilePicUrlByPath } = require('../Services/User');
 
 /* const test = async () => {
@@ -707,10 +707,10 @@ router.patch("/changeConversationPhoto", auth, async (req, res) => {
     console.log(usersTosend)
     const socketsIds = await getUsersSocketId(usersTosend);
     conversationObj.lastMessage = newMessage
-    emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);
+    emitChangeConvCustomizationToUsers(getIo(), socketsIds, conversationObj, "photo", photoStr);
 
     await session.commitTransaction();
-    res.status(200).json({ conversation: conversationObj, message: newMessage });
+    res.status(200).json({ conversation: conversationObj, customizationKey: "photo", customizationValue: photoStr });
 
   }
 
@@ -765,10 +765,10 @@ router.patch("/changeConversationName", auth, async (req, res) => {
     console.log(usersTosend)
     const socketsIds = await getUsersSocketId(usersTosend);
     conversationObj.lastMessage = newMessage
-    emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);
+    emitChangeConvCustomizationToUsers(getIo(), socketsIds, conversationObj, "conversationName", conversationName);
 
     await session.commitTransaction();
-    res.status(200).json({ conversation: conversationObj, message: newMessage });
+    res.status(200).json({ conversation: conversationObj, customizationKey: "conversationName", customizationValue: conversationName });
 
   }
 
@@ -820,10 +820,10 @@ router.patch("/changeEmoji", auth, async (req, res) => {
     const usersTosend = conversation.members.filter(member => member.username !== user.userName).map(member => member.username) // remove the user who sent the request// !! Read commit message !
     const socketsIds = await getUsersSocketId(usersTosend);
     conversationObj.lastMessage = newMessage
-    emitConvUpdateToUsers(getIo(), socketsIds, conversationObj);
+    emitChangeConvCustomizationToUsers(getIo(), socketsIds, conversationObj, "emoji", emoji);
 
     await session.commitTransaction();
-    res.status(200).json({ conversation: conversationObj, message: newMessage });
+    res.status(200).json({ conversation: conversationObj, customizationKey: "emoji", customizationValue: emoji });
 
   }
 

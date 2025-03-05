@@ -152,11 +152,17 @@ const emitRemoveMemberToUsers = (io, socketIdArr, conversation, removedUsername)
     }
   });
 }
-
+const emitChangeConvCustomizationToUsers = (io, socketIdArr, conversation, customizationKey, customizationValue) => {
+  socketIdArr.map((socketId) => {
+    if (socketId.socketId) {
+      io.to(socketId.socketId).emit("changeConvCustomization", { conversation, customizationKey, customizationValue })
+    }
+  });
+}
 
 module.exports = {
   emitChangeReactionToUsers, emitDeleteReactionToUsers,
   emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitConvUpdateToUsers,
   emitAdminChangeToUsers, emitNewFileToUsers, emitStatusChangeToUsers, emitUserOnlineStatus,
-  emitDeletedMsgToUsers, emitEditedMsgToUsers, emitProfilPicUpdate, emitAddMembersToUsers, emitRemoveMemberToUsers
+  emitDeletedMsgToUsers, emitEditedMsgToUsers, emitProfilPicUpdate, emitAddMembersToUsers, emitRemoveMemberToUsers, emitChangeConvCustomizationToUsers
 };
