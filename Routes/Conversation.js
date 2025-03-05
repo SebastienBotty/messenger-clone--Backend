@@ -10,23 +10,6 @@ const { getIo } = require('../Config/Socket') // Importer le serveur Socket.IO i
 const { emitConvUpdateToUsers, emitAddMembersToUsers, emitRemoveMemberToUsers, emitChangeConvCustomizationToUsers, emitChangeConvAdminToUsers } = require('../Utils/SocketUtils');
 const { getUsersSocketId, getUserProfilePicUrlByPath } = require('../Services/User');
 
-/* const test = async () => {
-  try {
-    const users = await User.find({});
-    for (let user of users) {
-      user.conversations = []
-      await user.save()
-      console.log(user.userName + "done")
-    }
-    console.log('fone')
-  } catch (error) {
-    console.log(error)
-  }
-
-}
-
-test() */
-
 //----------------------POST---------------------------
 router.post("/", auth, checkPostConvBody, async (req, res) => {
   const members = req.body.members;
@@ -58,7 +41,7 @@ router.post("/", auth, checkPostConvBody, async (req, res) => {
         userId: user._id,
         username: user.userName,
         nickname: "",
-        photo: user.photo,
+        photo: user.photo ? await getUserProfilePicUrlByPath(user.photo) : "",
         status: user.status,
         isOnline: user.isOnline
       }
