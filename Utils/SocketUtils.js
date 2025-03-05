@@ -159,10 +159,18 @@ const emitChangeConvCustomizationToUsers = (io, socketIdArr, conversation, custo
     }
   });
 }
+const emitChangeConvAdminToUsers = (io, socketIdArr, conversation, targetUsername, changeAdmin) => {
+  socketIdArr.map((socketId) => {
+    if (socketId.socketId) {
+      io.to(socketId.socketId).emit("changeConvAdmin", { conversation, targetUsername, changeAdmin })
+    }
+  });
+}
 
 module.exports = {
   emitChangeReactionToUsers, emitDeleteReactionToUsers,
   emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitConvUpdateToUsers,
   emitAdminChangeToUsers, emitNewFileToUsers, emitStatusChangeToUsers, emitUserOnlineStatus,
-  emitDeletedMsgToUsers, emitEditedMsgToUsers, emitProfilPicUpdate, emitAddMembersToUsers, emitRemoveMemberToUsers, emitChangeConvCustomizationToUsers
+  emitDeletedMsgToUsers, emitEditedMsgToUsers, emitProfilPicUpdate, emitAddMembersToUsers,
+  emitRemoveMemberToUsers, emitChangeConvCustomizationToUsers, emitChangeConvAdminToUsers
 };

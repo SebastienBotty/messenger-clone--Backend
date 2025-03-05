@@ -7,7 +7,7 @@ const { auth, authAdmin } = require("../Middlewares/authentication");
 const checkPostConvBody = require("../Middlewares/Conversation");
 
 const { getIo } = require('../Config/Socket') // Importer le serveur Socket.IO initialisé
-const { emitConvUpdateToUsers, emitAddMembersToUsers, emitRemoveMemberToUsers, emitChangeConvCustomizationToUsers } = require('../Utils/SocketUtils');
+const { emitConvUpdateToUsers, emitAddMembersToUsers, emitRemoveMemberToUsers, emitChangeConvCustomizationToUsers, emitChangeConvAdminToUsers } = require('../Utils/SocketUtils');
 const { getUsersSocketId, getUserProfilePicUrlByPath } = require('../Services/User');
 
 /* const test = async () => {
@@ -522,7 +522,7 @@ router.patch("/leaveConversation", auth, async (req, res) => {
   }
 
   const session = await Conversation.startSession();
-
+  let isAdmin = false;
   try {
     session.startTransaction();
 
@@ -539,6 +539,7 @@ router.patch("/leaveConversation", auth, async (req, res) => {
         throw new Error("Conversation must have at least one admin");
       }
       conversation.admin = conversation.admin.filter(admin => admin !== username);
+      isAdmin = true;
     }
     if (!conversation.members.some(member => member.username === username)) {
       throw new Error("User is not in the conversation");
@@ -566,6 +567,9 @@ router.patch("/leaveConversation", auth, async (req, res) => {
     const socketsIds = await getUsersSocketId(usersTosend);
     //console.log("LAAAALALALALALALALALALALALALA")
     emitRemoveMemberToUsers(getIo(), socketsIds, conversationObj, username);
+    if (isAdmin) {
+      emitChangeConvAdminToUsers(getIo(), socketsIds, conversationObj, username, false);
+    }
 
     await session.commitTransaction();
 
@@ -582,8 +586,8 @@ router.patch("/leaveConversation", auth, async (req, res) => {
 
 //PATCH ADMIN - First admin set someone admin of a group conversation 
 
-router.patch("/setAdmin", auth, async (req, res) => {
-  const { conversationId, addedUsername, userId, username } = req.body;
+router.patch("/changeAdmin", auth, async (req, res) => {
+  const { conversationId, targetUsername, userId, username, changeAdmin } = req.body;
   if (!conversationId || !username || !userId) {
     return res.status(400).json({ message: "All fields are required" });
   }
@@ -592,7 +596,7 @@ router.patch("/setAdmin", auth, async (req, res) => {
     return res.status(403).json({ message: "Access denied." });
   }
   try {
-    const conversation = await Conversation.findById(conversationId);
+    const conversation = await Conversation.findById(conversationId).select("-messages");
     if (!conversation) {
       return res.status(404).json({ message: "Conversation not found" });
     }
@@ -603,13 +607,23 @@ router.patch("/setAdmin", auth, async (req, res) => {
     if (!conversation.admin.includes(username)) {
       return res.status(400).json({ message: "You are not an admin of this conversation" });
     }
-    if (conversation.admin.includes(addedUsername)) {
-      return res.status(400).json({ message: "User is already an admin" });
-    }
-    conversation.admin.push(addedUsername)
 
+    if (changeAdmin) {
+      if (conversation.admin.includes(targetUsername)) {
+        return res.status(400).json({ message: "User is already an admin" });
+      }
+      conversation.admin.push(targetUsername)
+    } else {
+      conversation.admin = conversation.admin.filter(admin => admin !== targetUsername)
+    }
     await conversation.save();
-    res.status(200).json(conversation.admin);
+
+
+    const usersTosend = conversation.members.filter(member => member.username !== username).map(member => member.username) // remove the user who sent the request// !! Read commit message !
+    const socketsIds = await getUsersSocketId(usersTosend);
+
+    emitChangeConvAdminToUsers(getIo(), socketsIds, conversation, targetUsername, changeAdmin);
+    res.status(200).json({ conversation: conversation, targetUsername: targetUsername, changeAdmin: changeAdmin });
 
   } catch (error) {
     res.status(400).json({ message: error.message });
