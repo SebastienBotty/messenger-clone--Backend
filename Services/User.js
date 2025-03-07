@@ -1,9 +1,12 @@
 const User = require("../Models/User");
 const s3 = require("../Config/S3")
-const { emitUserOnlineStatus } = require("../Utils/SocketUtils")
-const { getIo } = require('../Config/Socket');
+
 
 const bucketName = process.env.AWS_BUCKET_NAME;
+
+const userStatusMap = new Map(); // { userId: { isOnline: boolean, status: string } }
+
+
 const getUsersSocketId = async (usersNameArr) => {
     const usersSockets = await Promise.all(
         usersNameArr.map(async (userName) => {
@@ -21,9 +24,24 @@ const getUsersSocketId = async (usersNameArr) => {
     return filteredUsersSockets
 }
 
+const getUsersSocketIdById = async (idsArr) => {
+    const usersSockets = await Promise.all(
+        idsArr.map(async (id) => {
+            const user = await User.findById(id, { socketId: 1, userName: 1 });
+            //console.log(user)
+            if (!user) {
+                return null;
+            }
+            return { username: user.userName, userId: id, socketId: user.socketId };
+        })
+    );
+    const filteredUsersSockets = usersSockets.filter((socket) => socket !== null);
+    return filteredUsersSockets
+}
+
 //Set User online
 
-const setUserOnline = async (io, socketId, userId) => {
+const setUserOnline = async (socketId, userId) => {
     try {
         const user = await User.findById(userId).select("-messages");
         if (!user) {
@@ -34,11 +52,7 @@ const setUserOnline = async (io, socketId, userId) => {
         if (user.status !== "Offline") user.lastSeen = new Date();
         console.log("user online " + user.userName)
         await user.save();
-        const emitData = { username: user.userName, isOnline: user.isOnline, userId: user._id, lastSeen: user.lastSeen, socketId: user.socketId };
-        /* console.log("xxx")
-        console.log(emitData) */
-        emitUserOnlineStatus(io, emitData);
-        return true
+        return user
     } catch (error) {
         console.error(error.message)
         return false
@@ -87,4 +101,38 @@ const getUserProfilePicUrlByPath = async (path) => {
     });
     return signedUrl
 }
-module.exports = { getUsersSocketId, setUserOnline, setUserOffline, getUserProfilePicUrl, getUserProfilePicUrlByPath }
+
+const updateUserStatus = (userId, isOnline, status = undefined) => {
+    const currentStatus = getUserStatus(userId);
+    /*  console.log('"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+     console.log(currentStatus) */
+    const updatedStatus = {
+        ...currentStatus,
+        isOnline,
+        status: status === undefined ? currentStatus.status : status,
+        lastSeen: status === "Offline" || isOnline === false ? currentStatus.lastSeen : new Date(),
+    };
+    /*     console.log(updatedStatus)
+     */
+    userStatusMap.set(userId, updatedStatus);
+    /*  console.log(`Statut de l'utilisateur ${userId} mis à jour :`, updatedStatus);
+     console.log(userStatusMap) */
+    return updatedStatus
+};
+
+const getUserStatus = (userId) => {
+    const user = userStatusMap.get(userId)
+    if (!user) {
+        console.log('no user ofund')
+        return {
+            isOnline: false,
+            status: "Online",
+            lastSeen: new Date()
+        }
+    }
+    console.log("user found")
+    return user
+};
+
+
+module.exports = { getUsersSocketId, getUsersSocketIdById, setUserOnline, setUserOffline, getUserProfilePicUrl, getUserProfilePicUrlByPath, getUserStatus, updateUserStatus, userStatusMap }

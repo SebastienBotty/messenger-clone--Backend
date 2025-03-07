@@ -83,21 +83,16 @@ const emitNewFileToUsers = (io, socketIdArr, data, conversation) => {
   });
 }
 
-const emitStatusChangeToUsers = (io, userData) => {
-  if (!userData?.socketId) return
+const emitStatusChangeToUsers = (io, socketIdArr, userData) => {
 
-  io.except(userData.socketId).emit('changeStatus', { status: userData.status, lastSeen: userData.lastSeen, userId: userData.userId, username: userData.username });
+
+  socketIdArr.map((socketId) => {
+    io.to(socketId.socketId).emit('changeStatus', { status: userData.status, isOnline: userData.isOnline, lastSeen: userData.lastSeen, userId: userData.userId });
+    //console.log("status change emitted to " + socketId.userId);
+  })
 }
 
-const emitUserOnlineStatus = (io, userData) => {
-  if (!userData?.socketId) {
-    io.emit('isUserOnline', { isOnline: userData.isOnline, lastSeen: userData.lastSeen, userId: userData.userId, username: userData.username });
-    return
-  }
-  /* console.log('emitUserOnlineStatus')
-  console.log(userData) */
-  io.except(userData.socketId).emit('isUserOnline', { isOnline: userData.isOnline, lastSeen: userData.lastSeen, userId: userData.userId, username: userData.username });
-}
+
 
 const emitDeletedMsgToUsers = (io, socketIdArr, message, conversationId) => {
   socketIdArr.map((socketId) => {
@@ -170,7 +165,7 @@ const emitChangeConvAdminToUsers = (io, socketIdArr, conversation, targetUsernam
 module.exports = {
   emitChangeReactionToUsers, emitDeleteReactionToUsers,
   emitMsgToUsers, emitTypingToUsers, emitSeenMsgToUsers, emitConvUpdateToUsers,
-  emitAdminChangeToUsers, emitNewFileToUsers, emitStatusChangeToUsers, emitUserOnlineStatus,
+  emitAdminChangeToUsers, emitNewFileToUsers, emitStatusChangeToUsers,
   emitDeletedMsgToUsers, emitEditedMsgToUsers, emitProfilPicUpdate, emitAddMembersToUsers,
   emitRemoveMemberToUsers, emitChangeConvCustomizationToUsers, emitChangeConvAdminToUsers
 };

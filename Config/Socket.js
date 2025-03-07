@@ -8,7 +8,8 @@ const {
     emitAdminChangeToUsers,
     emitUserOnlineStatus
 } = require("../Utils/SocketUtils");
-const { setUserOnline, setUserOffline } = require("../Services/User");
+const { setUserOnline, setUserOffline, updateUserStatus } = require("../Services/User");
+const { notifyUserStatusChange } = require("../Services/Conversation");
 
 let io
 //------------------Web Socket
@@ -36,11 +37,14 @@ const initSocket = (server) => {
 
     io.on("connection", (socket) => {
         console.log(socket.id + " connected");
-        socket.on("userConnected", ({ socketId, userId }) => {
+        socket.on("userConnected", async ({ socketId, userId }) => {
             socket.userId = userId
             console.log("USER CONNECTED");
             console.log(socket.userId)
-            setUserOnline(getIo(), socketId, userId);
+            setUserOnline(socketId, userId);
+            const updatedUser = await updateUserStatus(userId, true);
+            notifyUserStatusChange(io, userId, true, null, updatedUser.lastSeen);
+
         })
         //emitUserOnlineStatus()
         socket.on("typing", (data) => {
@@ -67,8 +71,14 @@ const initSocket = (server) => {
 
         socket.on("disconnect", async () => {
             console.log(socket.id + " disconnected");
-            const user = await setUserOffline(socket.userId);
-            emitUserOnlineStatus(io, user);
+            const setOfflineInDb = await setUserOffline(socket.userId);
+            console.log("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+            console.log(setOfflineInDb)
+            console.log("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+
+            const updatedStatus = await updateUserStatus(socket.userId, false);
+            notifyUserStatusChange(io, socket.userId, false, null, updatedStatus.lastSeen);
+
         });
     });
 

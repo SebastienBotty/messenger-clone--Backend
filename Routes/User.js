@@ -6,9 +6,9 @@ const Conversation = require("../Models/Conversation");
 const Message = require("../Models/Message");
 const jwt = require("jsonwebtoken");
 const { auth, authAdmin } = require("../Middlewares/authentication");
-const { emitStatusChangeToUsers, emitUserOnlineStatus } = require("../Utils/SocketUtils");
 const { getIo } = require('../Config/Socket');
-const { getUserProfilePicUrl } = require("../Services/User");
+const { getUserProfilePicUrl, updateUserStatus } = require("../Services/User");
+const { notifyUserStatusChange } = require("../Services/Conversation");
 require("dotenv").config();
 
 //-------------------------POST
@@ -258,7 +258,9 @@ router.patch("/userId/:userId/socketId", auth, async (req, res) => {
     //console.log(user)
     await user.save();
     const emitData = { username: user.userName, isOnline: user.isOnline, userId: user._id, lastSeen: user.lastSeen, socketId: user.socketId };
-    emitUserOnlineStatus(getIo(), emitData);
+    updateUserStatus(userId, user.isOnline, user.status);
+    notifyUserStatusChange(getIo(), userId, user.isOnline, user.status);
+
     res.status(200).json(user.socketId);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -283,7 +285,9 @@ router.patch("/:userId/changeStatus", auth, async (req, res) => {
     user.status = status;
     await user.save();
     const emitData = { username: user.userName, userId: user._id, status: user.status, lastSeen: lastSeen, socketId: user.socketId };
-    emitStatusChangeToUsers(getIo(), emitData);
+    updateUserStatus(user._id, user.isOnline, user.status);
+    notifyUserStatusChange(getIo(), user._id, user.isOnline, user.status, lastSeen);
+
     res.status(200).json({ status: user.status, lastSeen: lastSeen });
 
   } catch (error) {

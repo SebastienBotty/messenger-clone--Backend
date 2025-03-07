@@ -10,6 +10,8 @@ const { getIo } = require('../Config/Socket') // Importer le serveur Socket.IO i
 const { emitConvUpdateToUsers, emitAddMembersToUsers, emitRemoveMemberToUsers, emitChangeConvCustomizationToUsers, emitChangeConvAdminToUsers } = require('../Utils/SocketUtils');
 const { getUsersSocketId, getUserProfilePicUrlByPath } = require('../Services/User');
 
+
+
 //----------------------POST---------------------------
 router.post("/", auth, checkPostConvBody, async (req, res) => {
   const members = req.body.members;
@@ -45,7 +47,7 @@ router.post("/", auth, checkPostConvBody, async (req, res) => {
         status: user.status,
         isOnline: user.isOnline
       }
-/*       console.log(memberData);
+/*       //console.log(memberData);
  */      membersData.push(memberData)
     }
 
@@ -57,24 +59,24 @@ router.post("/", auth, checkPostConvBody, async (req, res) => {
       creationDate: creationDate,
       removedMembers: [],
     });
-    console.log('1')
+    //console.log('1')
 
     const newConversation = await conversation.save();
-    console.log('"2')
+    //console.log('"2')
     for (let member of members) {
       const user = await User.findOne({
         userName: new RegExp("^" + member + "$", "i"),
       });
       if (user) {
         user.conversations.push(newConversation._id);
-        console.log(user.userName + " trouver")
+        //console.log(user.userName + " trouver")
         await user.save();
       } else {
-        console.log(user + " pas trouvé")
+        //console.log(user + " pas trouvé")
         return res.status(404).json({ message: "User member not found" });
       }
     }
-    console.log('"3')
+    //console.log('"3')
     res.status(201).json(newConversation);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -116,10 +118,10 @@ router.get("/userId/:userId/getConversations?", auth, async (req, res) => {
 
   try {
     const user = await User.findById(userId);
-    /*     console.log("1")
+    /*     //console.log("1")
      */
     if (!user) {
-/*       console.log("2")
+/*       //console.log("2")
  */      return res.status(404).json({ message: "User not found" });
     }
     for (convId of conversationsIds) {
@@ -168,7 +170,7 @@ router.get(
           .json({ message: "Access denied. You're not in this conversation." });
       }
       if (conversation.removedMembers.some(member => member.username === username.userName)) {
-        //console.log("2")
+        ////console.log("2")
         const lastMessage = await Message.findOne({
           conversationId: conversationId,
           date: conversation.removedMembers.find(member => member.username === username.userName).date,
@@ -212,7 +214,7 @@ router.get("/userId/:userId/privateConversation?", auth, async (req, res) => {
   const userId = req.params.userId;
   const username = req.query.username;
   const recipientUsername = req.query.recipient;
-  //console.log(userId, username, recipientUsername);
+  ////console.log(userId, username, recipientUsername);
 
   if (userId !== req.user.userId) {
     return res
@@ -224,7 +226,7 @@ router.get("/userId/:userId/privateConversation?", auth, async (req, res) => {
       userName: new RegExp("^" + username, "i"),
     });
     if (!user) {
-      console.log("USER NOT FOUND POUR IS PRIVATE CONV")
+      //console.log("USER NOT FOUND POUR IS PRIVATE CONV")
       return res.status(404).json({ message: "User" + username + " not found" });
     }
     const conversationsId = user.conversations;
@@ -235,7 +237,7 @@ router.get("/userId/:userId/privateConversation?", auth, async (req, res) => {
           conversation.members.some(member => member.username === username) &&
           conversation.members.some(member => member.username === recipientUsername)
         ) {
-          console.log("CONVEERSATOIN EXISTANTE")
+          //console.log("CONVEERSATOIN EXISTANTE")
           const conversationObj = conversation.toObject();
           for (const member of conversationObj.members) {
             member.photo = member.photo ? await getUserProfilePicUrlByPath(member.photo) : ""
@@ -244,7 +246,7 @@ router.get("/userId/:userId/privateConversation?", auth, async (req, res) => {
         }
       }
     }
-    console.log("PAS DE CONVEERSATOIN EXISTANTE")
+    //console.log("PAS DE CONVEERSATOIN EXISTANTE")
     res.json(false);
   } catch (error) {
     res.status(400).json({ mesage: error.message });
@@ -257,7 +259,7 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
   const userId = req.params.userId;
   const members = req.query.members ? req.query.members.split(',') : [];
   const user = req.query.user ? req.query.user : '';
-  console.log(userId, members, user)
+  //console.log(userId, members, user)
   if (!user) {
     return res.status(400).json({ message: "User query parameter is required and must not be empty." });
   }
@@ -279,7 +281,7 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
     }).select("-messages")
 
     if (conversations.length === 0) {
-      //console.log("RIEN TROUVE")
+      ////console.log("RIEN TROUVE")
       conversations = await Conversation.find({
         "customization.conversationName": { $in: regexMembers },
         members: { $in: regexUser },
@@ -300,14 +302,14 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
 
             const lastMessage = await Message.findById(lastMsgId);
             test.push({ ...conversation.toObject(), lastMessage: lastMessage, photo: "" })
-            //console.log(test)
+            ////console.log(test)
           }
 
         }
         catch (error) {
           res.status(400).json({ message: error.message });
         }
-        //console.log(conversation)
+        ////console.log(conversation)
       }
     }
 
@@ -324,7 +326,7 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
 
 router.patch("/addMembers", auth, async (req, res) => {
   const { conversationId, adderUsername, adderUserId, addedUsers, date } = req.body;
-  //console.log(req.body)
+  ////console.log(req.body)
 
   if (!conversationId || !adderUsername || !adderUserId || !addedUsers || !addedUsers.length || !date) {
     return res.status(400).json({ message: "All fields are required" });
@@ -387,8 +389,8 @@ router.patch("/addMembers", auth, async (req, res) => {
       }
 
       if (conversation.removedMembers.some(member => member.username === addedUsername)) {
-        //console.log("here")
-        //console.log(conversation.removedMembers)
+        ////console.log("here")
+        ////console.log(conversation.removedMembers)
         conversation.removedMembers = conversation.removedMembers.filter(member => member.username !== addedUsername)
       }
       const userObj = {
@@ -401,8 +403,8 @@ router.patch("/addMembers", auth, async (req, res) => {
         isTyping: false,
         photo: addedUserPhoto
       }
-      console.log("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
-      console.log(addedUserPhoto)
+      //console.log("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+      //console.log(addedUserPhoto)
       conversation.members.push(userObj)
       addedUsersArr.push(userObj)
     }
@@ -499,7 +501,7 @@ router.patch("/removeUser", auth, async (req, res) => {
 // PATCH CONV MEMBERS - Users leaves group conversation
 router.patch("/leaveConversation", auth, async (req, res) => {
   const { conversationId, username, userId, date } = req.body;
-  //console.log(req.body)
+  ////console.log(req.body)
   if (!conversationId || !username || !userId || !date) {
     return res.status(400).json({ message: "All fields are required" });
   }
@@ -552,7 +554,7 @@ router.patch("/leaveConversation", auth, async (req, res) => {
     conversationObj.lastMessage = newMessage
     const usersTosend = [...conversation.members.map(member => member.username), username]
     const socketsIds = await getUsersSocketId(usersTosend);
-    //console.log("LAAAALALALALALALALALALALALALA")
+    ////console.log("LAAAALALALALALALALALALALALALA")
     emitRemoveMemberToUsers(getIo(), socketsIds, conversationObj, username);
     if (isAdmin) {
       emitChangeConvAdminToUsers(getIo(), socketsIds, conversationObj, username, false);
@@ -621,8 +623,8 @@ router.patch("/changeAdmin", auth, async (req, res) => {
 // PATCH ADMIN - Remove someone admin of a group conversation
 router.patch("/removeAdmin", auth, async (req, res) => {
   const { conversationId, username, removerUserId, removedUsername } = req.body;
-  //console.log(req.body)
-  //console.log(conversationId, removedUsername, removerUserId, username)
+  ////console.log(req.body)
+  ////console.log(conversationId, removedUsername, removerUserId, username)
   if (!conversationId || !removerUserId || !removedUsername || !username) {
     return res.status(400).json({ message: "All fields are required" });
   }
@@ -705,7 +707,7 @@ router.patch("/changeConversationPhoto", auth, async (req, res) => {
     delete conversationObj.messages;
 
     const usersTosend = conversation.members.filter(member => member.username !== user.userName).map(member => member.username) // remove the user who sent the request// !! Read commit message !
-    console.log(usersTosend)
+    //console.log(usersTosend)
     const socketsIds = await getUsersSocketId(usersTosend);
     conversationObj.lastMessage = newMessage
     emitChangeConvCustomizationToUsers(getIo(), socketsIds, conversationObj, "photo", photoStr);
@@ -763,7 +765,7 @@ router.patch("/changeConversationName", auth, async (req, res) => {
     delete conversationObj.messages;
 
     const usersTosend = conversation.members.filter(member => member.username !== user.userName).map(member => member.username) // remove the user who sent the request// !! Read commit message !!
-    console.log(usersTosend)
+    //console.log(usersTosend)
     const socketsIds = await getUsersSocketId(usersTosend);
     conversationObj.lastMessage = newMessage
     emitChangeConvCustomizationToUsers(getIo(), socketsIds, conversationObj, "conversationName", conversationName);
@@ -878,7 +880,7 @@ router.patch("/changeNickname", auth, async (req, res) => {
     conversationObj.lastMessage = newMessage
     emitConvUpdateToUsers(getIo(), socketsIds, conversationObj, "changeNickname", userTargetId, nickname);
     await session.commitTransaction();
-    console.log(conversationObj)
+    //console.log(conversationObj)
     res.status(200).json({ conversation: conversationObj });
 
   } catch (error) {
@@ -941,9 +943,9 @@ router.patch("/unmuteConversation", auth, async (req, res) => {
   if (!conversation.members.includes(unmutedByUsername)) return res.status(400).json({ message: "User is not a member of this conversation" });
 
   if (conversation.mutedBy.some(member => member.userId === userId)) {
-    console.log(conversation.mutedBy)
+    //console.log(conversation.mutedBy)
     conversation.mutedBy = conversation.mutedBy.filter(member => member.userId !== userId);
-    console.log(conversation.mutedBy)
+    //console.log(conversation.mutedBy)
 
   } else return res.status(400).json({ message: "User is not muted in this conversation" });
 
