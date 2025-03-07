@@ -122,11 +122,13 @@ const updateUserStatus = (userId, isOnline, status = undefined) => {
 
 const getUserStatus = (userId) => {
     const user = userStatusMap.get(userId)
+    /*  console.table(userStatusMap)
+     console.log(userId) */
     if (!user) {
         console.log('no user ofund')
         return {
             isOnline: false,
-            status: "Online",
+            status: "Offline",
             lastSeen: new Date()
         }
     }

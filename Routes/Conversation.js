@@ -8,7 +8,7 @@ const checkPostConvBody = require("../Middlewares/Conversation");
 
 const { getIo } = require('../Config/Socket') // Importer le serveur Socket.IO initialisé
 const { emitConvUpdateToUsers, emitAddMembersToUsers, emitRemoveMemberToUsers, emitChangeConvCustomizationToUsers, emitChangeConvAdminToUsers } = require('../Utils/SocketUtils');
-const { getUsersSocketId, getUserProfilePicUrlByPath } = require('../Services/User');
+const { getUsersSocketId, getUserProfilePicUrlByPath, getUserStatus } = require('../Services/User');
 
 
 
@@ -131,6 +131,12 @@ router.get("/userId/:userId/getConversations?", auth, async (req, res) => {
       for (const member of conversationObj.members) {
         const userPhoto = await User.findById(member.userId).select("photo")        //Get the signed url of the profile picture, would be better by doing it with a populate but that would make me change the schema and adapt whole codebase
         member.photo = userPhoto.photo ? await getUserProfilePicUrlByPath(userPhoto.photo) : ""
+        const memberStatus = await getUserStatus(member.userId)
+        member.status = memberStatus.status
+        member.isOnline = memberStatus.isOnline
+        member.lastSeen = memberStatus.lastSeen
+        console.log(memberStatus)
+        console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
       }
       convsArr.push(conversationObj)
 
