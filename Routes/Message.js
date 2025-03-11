@@ -114,6 +114,8 @@ router.get("/userId/:userId/getRecentMessages", auth, async (req, res) => {
   const conversationId = req.query.conversationId;
   const limit = 20
 
+  if (!userId) return res.status(400).json({ message: "No user Id" })
+  if (!conversationId) return res.status(400).json({ message: "No conveersation Id" })
   console.log(userId, conversationId)
   if (userId !== req.user.userId) {
     return res
@@ -161,6 +163,142 @@ router.get("/userId/:userId/getRecentMessages", auth, async (req, res) => {
 
   }
 })
+
+router.get('/userId/:userId/getOlderMessages', auth, async (req, res) => {
+  const userId = req.params.userId
+  const conversationId = req.query.conversationId
+  const messageId = req.query.messageId
+  const limit = parseInt(req.query.limit) || 20
+
+  if (!userId) return res.status(400).json({ message: "No user Id" })
+  if (!conversationId) return res.status(400).json({ message: "No conversation Id" })
+  if (!messageId) return res.status(400).json({ message: "No message Id" })
+
+  try {
+    // Vérifier si la conversation existe
+    const convMembers = await Conversation.findById(conversationId);
+    if (!convMembers) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    // Vérifier si l'utilisateur est membre de la conversation
+    const user = await User.findById(userId).select("userName deletedConversations");
+    if (!convMembers.members.some(member => member.username === user.userName) &&
+      !convMembers.removedMembers.some((member) => member.username === user.userName)) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. You're not in this conversation." });
+    }
+
+    // Vérifier si la conversation a été supprimée par l'utilisateur
+    const deletedConversation = user.deletedConversations.find((conv) => conv.conversationId === conversationId)
+    const removedMember = convMembers.removedMembers.find((member) => member.username === user.userName)
+
+    // Trouver le message de référence pour obtenir sa date
+    const referenceMessage = await Message.findById(messageId);
+    if (!referenceMessage) {
+      return res.status(404).json({ message: "Reference message not found" });
+    }
+
+
+    const messages = await Message.find({
+      conversationId: conversationId,
+      _id: { $lt: messageId },
+
+      date: {
+        $lt: new Date(referenceMessage.date),
+        $gte: new Date(deletedConversation?.deleteDate || 0),
+        ...(removedMember ? { $lte: new Date(removedMember.date) } : {})
+      },
+      deletedBy: {
+        $not: {
+          $elemMatch: { username: user.userName }
+        }
+      }
+    })
+      .sort({ date: -1 })
+      .limit(limit)
+      .populate({
+        path: "responseToMsgId",
+        select: "author authorId text date conversationId deletedBy",
+      });
+
+    console.log(messages)
+    if (messages.length === 0) {
+      return res.status(400).json({ message: "No older messages" });
+    }
+    res.status(200).json(messages);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+router.get('/userId/:userId/getNewerMessages', auth, async (req, res) => {
+  const userId = req.params.userId
+  const conversationId = req.query.conversationId
+  const messageId = req.query.messageId
+  const limit = parseInt(req.query.limit) || 20
+  console.log("newerMessages")
+  if (!userId) return res.status(400).json({ message: "No user Id" })
+  if (!conversationId) return res.status(400).json({ message: "No conversation Id" })
+  if (!messageId) return res.status(400).json({ message: "No message Id" })
+
+  try {
+    // Vérifier si la conversation existe
+    const convMembers = await Conversation.findById(conversationId);
+    if (!convMembers) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    // Vérifier si l'utilisateur est membre de la conversation
+    const user = await User.findById(userId).select("userName deletedConversations");
+    if (!convMembers.members.some(member => member.username === user.userName) &&
+      !convMembers.removedMembers.some((member) => member.username === user.userName)) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. You're not in this conversation." });
+    }
+
+    // Vérifier si la conversation a été supprimée par l'utilisateur
+    const deletedConversation = user.deletedConversations.find((conv) => conv.conversationId === conversationId)
+    const removedMember = convMembers.removedMembers.find((member) => member.username === user.userName)
+
+    // Trouver le message de référence pour obtenir sa date
+    const referenceMessage = await Message.findById(messageId);
+    if (!referenceMessage) {
+      return res.status(404).json({ message: "Reference message not found" });
+    }
+
+
+    const messages = await Message.find({
+      conversationId: conversationId,
+      _id: { $gt: messageId },
+      date: {
+        $gte: new Date(deletedConversation?.deleteDate || 0),
+        ...(removedMember ? { $lte: new Date(removedMember.date) } : {})
+      },
+      deletedBy: {
+        $not: {
+          $elemMatch: { username: user.userName }
+        }
+      }
+    })
+      .sort({ date: 1 })
+      .limit(limit)
+      .populate({
+        path: "responseToMsgId",
+        select: "author authorId text date conversationId deletedBy",
+      })
+
+    console.log(messages)
+    if (messages.length === 0) {
+      return res.status(400).json({ message: "No newer messages" });
+    }
+    res.status(200).json(messages);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
 //Get X messages of a conversation starting at a given Y index
 router.get(
   "/userId/:userId/getMessages",
@@ -338,37 +476,86 @@ router.get("/userId/:userId/getMessagesBeforeAndAfter", auth, async (req, res) =
   const userId = req.params.userId;
   const messageId = req.query.messageId;
   const conversationId = req.query.conversationId;
-  const messages = [[], []];
+
   if (userId !== req.user.userId) {
     return res
       .status(403)
       .json({ message: "Access denied. You're not who you pretend to be." });
   }
+
   try {
-    const messagesBefore = await Message.find({
-      conversationId: conversationId,
-      _id: { $lt: messageId },
-    })
-      .sort({ date: -1 })
-      .limit(10)
-      .populate({
-        path: "responseToMsgId",
-        select: "author authorId text date conversationId deletedBy",
+    // Vérifier si l'utilisateur a accès à la conversation
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    const user = await User.findById(userId).select("userName deletedConversations");
+    if (!conversation.members.some(member => member.username === user.userName) &&
+      !conversation.removedMembers.some(member => member.username === user.userName)) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. You're not in this conversation." });
+    }
+
+    // Vérifier si la conversation a été supprimée par l'utilisateur
+    const deletedConversation = user.deletedConversations.find(conv => conv.conversationId === conversationId);
+    const removedMember = conversation.removedMembers.find(member => member.username === user.userName);
+
+    // Exécuter les deux requêtes en parallèle avec Promise.all
+    const [messagesBefore, messagesAfter] = await Promise.all([
+      Message.find({
+        conversationId: conversationId,
+        _id: { $lt: messageId },
+        date: {
+          $gte: new Date(deletedConversation?.deleteDate || 0),
+          ...(removedMember ? { $lte: new Date(removedMember.date) } : {})
+        },
+        deletedBy: {
+          $not: {
+            $elemMatch: { username: user.userName }
+          }
+        }
       })
-    messages[0] = messagesBefore;
-    const messagesAfter = await Message.find({
-      conversationId: conversationId,
-      _id: { $gt: messageId },
-    })
-      .sort({ date: 1 })
-      .limit(10)
-      .populate({
-        path: "responseToMsgId",
-        select: "author authorId text date conversationId deletedBy",
+        .sort({ date: -1 })
+        .limit(10)
+        .populate({
+          path: "responseToMsgId",
+          select: "author authorId text date conversationId deletedBy",
+        })
+        .catch(err => {
+          console.error("Error fetching messages before:", err);
+          return []; // Retourne un tableau vide en cas d'erreur
+        }),
+
+      Message.find({
+        conversationId: conversationId,
+        _id: { $gt: messageId },
+        date: {
+          $gte: new Date(deletedConversation?.deleteDate || 0),
+          ...(removedMember ? { $lte: new Date(removedMember.date) } : {})
+        },
+        deletedBy: {
+          $not: {
+            $elemMatch: { username: user.userName }
+          }
+        }
       })
-    messages[1] = messagesAfter;
-    res.status(200).json(messages);
+        .sort({ date: 1 })
+        .limit(10)
+        .populate({
+          path: "responseToMsgId",
+          select: "author authorId text date conversationId deletedBy",
+        })
+        .catch(err => {
+          console.error("Error fetching messages after:", err);
+          return []; // Retourne un tableau vide en cas d'erreur
+        })
+    ]);
+
+    res.status(200).json([messagesBefore, messagesAfter]);
   } catch (error) {
+    console.error("General error:", error);
     res.status(400).json({ message: error.message });
   }
 });
