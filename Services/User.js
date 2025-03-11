@@ -125,14 +125,14 @@ const getUserStatus = (userId) => {
     /*  console.table(userStatusMap)
      console.log(userId) */
     if (!user) {
-        console.log('no user ofund')
+        //console.log('no user ofund')
         return {
             isOnline: false,
             status: "Offline",
             lastSeen: new Date()
         }
     }
-    console.log("user found")
+    //console.log("user found")
     return user
 };
 

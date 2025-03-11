@@ -135,8 +135,8 @@ router.get("/userId/:userId/getConversations?", auth, async (req, res) => {
         member.status = memberStatus.status
         member.isOnline = memberStatus.isOnline
         member.lastSeen = memberStatus.lastSeen
-        console.log(memberStatus)
-        console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        /* console.log(memberStatus)
+        console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!') */
       }
       convsArr.push(conversationObj)
 
