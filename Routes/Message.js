@@ -108,6 +108,59 @@ router.get("/userId/:userId/getMessageById", async (req, res) => {
   }
 });
 
+
+router.get("/userId/:userId/getRecentMessages", auth, async (req, res) => {
+  const userId = req.params.userId
+  const conversationId = req.query.conversationId;
+  const limit = 20
+
+  console.log(userId, conversationId)
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .json({ message: "Access denied. You're not who you pretend to be." });
+  }
+
+
+  try {
+    const convMembers = await Conversation.findById(conversationId);
+    if (!convMembers) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+    const user = await User.findById(userId).select("userName deletedConversations");
+    if (!convMembers.members.some(member => member.username === user.userName) && !convMembers.removedMembers.some((member) => member.username === user.userName)) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. You're not in this conversation." });
+    }
+    const deletedConversation = user.deletedConversations.find((conv) => conv.conversationId === conversationId)
+    const removedMember = convMembers.removedMembers.find((member) => member.username === user.userName)
+
+    const messages = await Message.find({
+      conversationId: conversationId,
+      date: {
+        $gte: new Date(deletedConversation?.deleteDate || 0),
+        ...(removedMember ? { $lte: new Date(removedMember.date) } : {})
+      },
+      deletedBy: {
+        $not: {
+          $elemMatch: { username: user.userName }
+        }
+      }
+    })
+      .sort({ date: -1 })
+      .limit(limit)
+      .populate({
+        path: "responseToMsgId",
+        select: "author authorId text date conversationId deletedBy",
+      })
+
+    res.status(200).json(messages);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+
+  }
+})
 //Get X messages of a conversation starting at a given Y index
 router.get(
   "/userId/:userId/getMessages",
