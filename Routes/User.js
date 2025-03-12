@@ -229,7 +229,7 @@ router.get("/userId/:userId/getLatestConversations?", auth, async (req, res) => 
   try {
     const conversations = await Conversation.find({
       members: { $in: [userId] },
-    }).select("-messages");
+    }).select("-messages").populate("lastMessage");
     res.status(200).json(conversations);
   } catch (error) {
     res.status(400).json({ message: error.message });

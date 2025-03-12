@@ -147,7 +147,7 @@ router.post("/userId/:userId/transferImage", auth, async (req, res) => {
       .status(403)
       .send("Access denied. You're not who you pretend to be.");
   }
-  const conversationSource = await Conversation.findById(conversationIdSource).select("members");
+  const conversationSource = await Conversation.findById(conversationIdSource).select("members").populate("lastMessage");
   if (!conversationSource) {
     //console.log('Conversation non trouvée')
     return res.status(404).json({ message: "Conversation not found" });
@@ -157,7 +157,7 @@ router.post("/userId/:userId/transferImage", auth, async (req, res) => {
     return res.status(403).json({ message: "You are not a member of the source conversation" });
   }
 
-  const conversationTarget = await Conversation.findById(targetConversationId).select("members");
+  const conversationTarget = await Conversation.findById(targetConversationId).select("members").populate("lastMessage");
   if (!conversationTarget) {
     return res.status(404).json({ message: "Conversation not found" });
   }
@@ -319,7 +319,7 @@ router.get('/userId/:userId/conversationId/:conversationId/getRecentFiles', asyn
     return res.status(404).json({ message: "User not found" });
   }
 
-  const convMembers = await Conversation.findById(conversationId);
+  const convMembers = await Conversation.findById(conversationId).populate("lastMessage");
   if (!convMembers) {
     return res.status(404).json({ message: "Conversation not found" });
   }
@@ -450,7 +450,7 @@ router.get("/userId/:userId/conversationId/:conversationId/getConversationImages
   if (!user) {
     return res.status(404).json({ message: "User not found" });
   }
-  const conversation = await Conversation.findById(convId);
+  const conversation = await Conversation.findById(convId).populate("lastMessage");
   if (!conversation) {
     return res.status(404).json({ message: "Conversation not found" });
   }

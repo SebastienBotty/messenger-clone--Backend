@@ -10,7 +10,24 @@ const { getIo } = require('../Config/Socket') // Importer le serveur Socket.IO i
 const { emitConvUpdateToUsers, emitAddMembersToUsers, emitRemoveMemberToUsers, emitChangeConvCustomizationToUsers, emitChangeConvAdminToUsers } = require('../Utils/SocketUtils');
 const { getUsersSocketId, getUserProfilePicUrlByPath, getUserStatus } = require('../Services/User');
 
+/* const test = async () => {
+  const users = await User.find({})
+  try {
+    for (const user of users) {
+      user.conversations = []
+      user.mutedConversations = []
+      user.deletedConversations = []
+      await user.save()
+      console.log("user " + user.userName + " correctly update conversations: " + user.conversations)
+    }
+    console.log("Travail terminé")
+  } catch (error) {
+    console.error(error.message)
+  }
 
+}
+
+test() */
 
 //----------------------POST---------------------------
 router.post("/", auth, checkPostConvBody, async (req, res) => {
@@ -87,7 +104,7 @@ router.post("/", auth, checkPostConvBody, async (req, res) => {
 //Get all conversations
 router.get("/", authAdmin, async (req, res) => {
   try {
-    const conversation = await Conversation.find();
+    const conversation = await Conversation.find().populate("lastMessage");
     res.json(conversation);
   } catch (error) {
     res.status(400).json({ mesage: error.message });
@@ -99,55 +116,37 @@ router.get("/", authAdmin, async (req, res) => {
 router.get("/:conversationId", authAdmin, async (req, res) => {
   const conversationId = req.params.conversationId;
   try {
-    const conversation = await Conversation.findById(conversationId).select('-messages');
+    const conversation = await Conversation.findById(conversationId).populate("lastMessage").select('-messages');
     res.json(conversation);
   } catch (error) {
     res.status(400).json({ mesage: error.message });
   }
 });
 
-//Get conversations based on an array of conversationId, return all field except messagesId
-router.get("/userId/:userId/getConversations?", auth, async (req, res) => {
-  const userId = req.params.userId;
-  const ids = req.query.conversationsId;
-  const conversationsIds = ids.split("-").map((id) => id.trim());
+//GET user's conversations 
+router.get("/userId/:userId/getConversations", auth, async (req, res) => {
+  const userId = req.params.userId
   if (req.user.userId !== userId) {
-    return res.status(403).send("Access denied.");
+    return res.status(403).send("Access denied, you're not who you pretend to be");
   }
-  let convsArr = []
-
+  let convIdsArr = []
+  let conversationsArr = []
   try {
-    const user = await User.findById(userId);
-    /*     //console.log("1")
-     */
-    if (!user) {
-/*       //console.log("2")
- */      return res.status(404).json({ message: "User not found" });
-    }
-    for (convId of conversationsIds) {
+    const user = await User.findById(userId).select("conversations")
+    if (!user) return res.status(404).json({ message: "User not found" })
+    convIdsArr = user.conversations
 
-      const conversation = await Conversation.findById(convId).select('-messages');
-      const conversationObj = conversation.toObject();
-      for (const member of conversationObj.members) {
-        const userPhoto = await User.findById(member.userId).select("photo")        //Get the signed url of the profile picture, would be better by doing it with a populate but that would make me change the schema and adapt whole codebase
-        member.photo = userPhoto.photo ? await getUserProfilePicUrlByPath(userPhoto.photo) : ""
-        const memberStatus = await getUserStatus(member.userId)
-        member.status = memberStatus.status
-        member.isOnline = memberStatus.isOnline
-        member.lastSeen = memberStatus.lastSeen
-        /* console.log(memberStatus)
-        console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!') */
-      }
-      convsArr.push(conversationObj)
-
+    for (const convId of convIdsArr) {
+      const conversation = await Conversation.findById(convId).select('-messages').populate("lastMessage")
+      if (!conversation) continue
+      conversationsArr.push(conversation)
     }
 
-
-    res.status(200).json(convsArr);
+    return res.status(200).json(conversationsArr)
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(400).json({ message: error.message })
   }
-});
+})
 
 // GET conversation last msg
 router.get(
@@ -165,7 +164,7 @@ router.get(
       if (!username) {
         return res.status(404).json({ message: "User not found" });
       }
-      const conversation = await Conversation.findById(conversationId)
+      const conversation = await Conversation.findById(conversationId).populate("lastMessage")
 
       if (!conversation) {
         return res.status(404).json({ message: "Conversation not found" });
@@ -237,7 +236,7 @@ router.get("/userId/:userId/privateConversation?", auth, async (req, res) => {
     }
     const conversationsId = user.conversations;
     for (const conversationId of conversationsId) {
-      const conversation = await Conversation.findById(conversationId);
+      const conversation = await Conversation.findById(conversationId).populate("lastMessage");
       if (!conversation.isGroupConversation) {
         if (
           conversation.members.some(member => member.username === username) &&
@@ -284,14 +283,14 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
   try {
     let conversations = await Conversation.find({
       members: { $all: [...regexMembers, regexUser] },
-    }).select("-messages")
+    }).select("-messages").populate("lastMessage")
 
     if (conversations.length === 0) {
       ////console.log("RIEN TROUVE")
       conversations = await Conversation.find({
         "customization.conversationName": { $in: regexMembers },
         members: { $in: regexUser },
-      }).select("-messages");
+      }).select("-messages").populate("lastMessage");
     }
 
 
@@ -301,7 +300,7 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
         try {
           const messagesId = await Conversation.findById(conversation._id).select(
             "messages"
-          );
+          ).populate("lastMessage");
 
           if (messagesId.messages.length > 0) {
             lastMsgId = messagesId.messages[messagesId.messages.length - 1];
@@ -346,7 +345,7 @@ router.patch("/addMembers", auth, async (req, res) => {
 
   try {
     session.startTransaction();
-    const conversation = await Conversation.findById(conversationId).session(session);
+    const conversation = await Conversation.findById(conversationId).populate("lastMessage").session(session);
     if (!conversation) {
       throw new Error("Conversation not found");
     }
@@ -415,6 +414,7 @@ router.patch("/addMembers", auth, async (req, res) => {
       addedUsersArr.push(userObj)
     }
     conversation.messages.push(newMessage._id);
+    conversation.lastMessage = newMessage._id
     await conversation.save({ session });
     const conversationObj = conversation.toObject();
     delete conversationObj.messages;
@@ -453,7 +453,7 @@ router.patch("/removeUser", auth, async (req, res) => {
     session.startTransaction();
 
 
-    const conversation = await Conversation.findById(conversationId).session(session);
+    const conversation = await Conversation.findById(conversationId).populate("lastMessage").session(session);
     if (!conversation) {
       throw new Error("Conversation not found");
     }
@@ -485,6 +485,7 @@ router.patch("/removeUser", auth, async (req, res) => {
 
     const newMessage = await message.save({ session });
     conversation.messages.push(newMessage._id);
+    conversation.lastMessage = newMessage._id
     await conversation.save({ session });
     const conversationObj = conversation.toObject();
     delete conversationObj.messages;
@@ -521,7 +522,7 @@ router.patch("/leaveConversation", auth, async (req, res) => {
   try {
     session.startTransaction();
 
-    const conversation = await Conversation.findById(conversationId).session(session);
+    const conversation = await Conversation.findById(conversationId).populate("lastMessage").session(session);
     if (!conversation) {
       throw new Error("Conversation not found");
     }
@@ -553,6 +554,7 @@ router.patch("/leaveConversation", auth, async (req, res) => {
 
     const newMessage = await message.save({ session });
     conversation.messages.push(newMessage._id);
+    conversation.lastMessage = newMessage._id
     await conversation.save({ session });
     const conversationObj = conversation.toObject();
 
@@ -591,7 +593,7 @@ router.patch("/changeAdmin", auth, async (req, res) => {
     return res.status(403).json({ message: "Access denied." });
   }
   try {
-    const conversation = await Conversation.findById(conversationId).select("-messages");
+    const conversation = await Conversation.findById(conversationId).populate("lastMessage").select("-messages");
     if (!conversation) {
       return res.status(404).json({ message: "Conversation not found" });
     }
@@ -639,7 +641,7 @@ router.patch("/removeAdmin", auth, async (req, res) => {
     return res.status(403).json({ message: "Access denied." });
   }
   try {
-    const conversation = await Conversation.findById(conversationId);
+    const conversation = await Conversation.findById(conversationId).populate("lastMessage");
     if (!conversation) {
       return res.status(404).json({ message: "Conversation not found" });
     }
@@ -683,7 +685,7 @@ router.patch("/changeConversationPhoto", auth, async (req, res) => {
     session.startTransaction();
 
 
-    const conversation = await Conversation.findById(conversationId).session(session);
+    const conversation = await Conversation.findById(conversationId).populate("lastMessage").session(session);
     if (!conversation) {
       return res.status(404).json({ message: "Conversation not found" });
     }
@@ -707,6 +709,8 @@ router.patch("/changeConversationPhoto", auth, async (req, res) => {
     const newMessage = await message.save({ session });
 
     conversation.messages.push(newMessage._id);
+    conversation.lastMessage = newMessage._id
+
     await conversation.save({ session });
 
     const conversationObj = conversation.toObject();
@@ -747,7 +751,7 @@ router.patch("/changeConversationName", auth, async (req, res) => {
     session.startTransaction();
 
 
-    const conversation = await Conversation.findById(conversationId).session(session);
+    const conversation = await Conversation.findById(conversationId).populate("lastMessage").session(session);
     if (!conversation) throw new Error("Conversation not found");
     if (!conversation.isGroupConversation) throw new Error("This is not a group conversation")
 
@@ -765,6 +769,8 @@ router.patch("/changeConversationName", auth, async (req, res) => {
     const newMessage = await message.save({ session });
 
     conversation.messages.push(newMessage._id);
+    conversation.lastMessage = newMessage._id
+
     await conversation.save({ session });
 
     const conversationObj = conversation.toObject();
@@ -804,7 +810,7 @@ router.patch("/changeEmoji", auth, async (req, res) => {
   try {
     session.startTransaction();
 
-    const conversation = await Conversation.findById(conversationId).session(session);
+    const conversation = await Conversation.findById(conversationId).populate("lastMessage").session(session);
     if (!conversation) throw new Error("Conversation not found");
 
     conversation.customization.emoji = emoji;
@@ -821,6 +827,8 @@ router.patch("/changeEmoji", auth, async (req, res) => {
     const newMessage = await message.save({ session });
 
     conversation.messages.push(newMessage._id);
+    conversation.lastMessage = newMessage._id
+
     await conversation.save({ session });
 
     const conversationObj = conversation.toObject();
@@ -853,7 +861,7 @@ router.patch("/changeNickname", auth, async (req, res) => {
   try {
     session.startTransaction();
 
-    const conversation = await Conversation.findById(conversationId);
+    const conversation = await Conversation.findById(conversationId).populate("lastMessage");
     if (!conversation) return res.status(404).json({ message: "Conversation not found" });
     if (!conversation.members.some(member => member.userId === userTargetId)) return res.status(400).json({ message: "UserTarget is not a member of this conversation" });
     if (!conversation.members.some(member => member.userId === userId)) return res.status(400).json({ message: "User is not a member of this conversation" });
@@ -874,8 +882,10 @@ router.patch("/changeNickname", auth, async (req, res) => {
     const newMessage = await message.save({ session });
 
     conversation.messages.push(newMessage._id);
-    conversation.members.find(member => member.userId === userTargetId).nickname = nickname;
     await conversation.save({ session });
+
+    conversation.members.find(member => member.userId === userTargetId).nickname = nickname;
+    conversation.lastMessage = newMessage._id
 
 
 
@@ -898,71 +908,6 @@ router.patch("/changeNickname", auth, async (req, res) => {
 
 })
 
-/* //PATCH conversation mutedBy : Add a user to the mutedBy array
-
-router.patch("/muteConversation", auth, async (req, res) => {
-  const { conversationId, mutedByUsername, userId, untilMuteDate } = req.body;
-
-  if (!conversationId || !mutedByUsername || !userId || !untilMuteDate) return res.status(400).json({ message: "All fields are required" });
-
-  if (req.user.userId !== userId) return res.status(403).json({ message: "Access denied." });
-
-  const user = await User.findById(userId).select("userName");
-  if (!user) return res.status(404).json({ message: "User not found" });
-  if (user.userName !== mutedByUsername) return res.status(400).json({ message: "Error: Muted user must be the same as the user who sent the request" });
-
-  const conversation = await Conversation.findById(conversationId);
-  if (!conversation) return res.status(404).json({ message: "Conversation not found" });
-  if (!conversation.members.includes(mutedByUsername)) return res.status(400).json({ message: "User is not a member of this conversation" });
-
-  if (conversation.mutedBy.some(member => member.userId === userId)) {
-    conversation.mutedBy.filter(member => member.userId !== userId);
-  }
-
-  conversation.mutedBy.push({
-    userId: userId,
-    untilDate: new Date(untilMuteDate)
-  });
-
-  try {
-    await conversation.save();
-    res.status(200).json({ userId: userId, untilDate: new Date(untilMuteDate) });
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-})
-
-//PATCH conversation mutedBy : Remove a user from the mutedBy array
-router.patch("/unmuteConversation", auth, async (req, res) => {
-  const { conversationId, unmutedByUsername, userId } = req.body;
-
-  if (!conversationId || !unmutedByUsername || !userId) return res.status(400).json({ message: "All fields are required" });
-
-  if (req.user.userId !== userId) return res.status(403).json({ message: "Access denied." });
-
-  const user = await User.findById(userId).select("userName");
-  if (!user) return res.status(404).json({ message: "User not found" });
-  if (user.userName !== unmutedByUsername) return res.status(400).json({ message: "Error: Unmuted user must be the same as the user who sent the request" });
-
-  const conversation = await Conversation.findById(conversationId);
-  if (!conversation) return res.status(404).json({ message: "Conversation not found" });
-  if (!conversation.members.includes(unmutedByUsername)) return res.status(400).json({ message: "User is not a member of this conversation" });
-
-  if (conversation.mutedBy.some(member => member.userId === userId)) {
-    //console.log(conversation.mutedBy)
-    conversation.mutedBy = conversation.mutedBy.filter(member => member.userId !== userId);
-    //console.log(conversation.mutedBy)
-
-  } else return res.status(400).json({ message: "User is not muted in this conversation" });
-
-
-  try {
-    await conversation.save();
-    res.status(200).json({ userId: userId });
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-}) */
 
 
 

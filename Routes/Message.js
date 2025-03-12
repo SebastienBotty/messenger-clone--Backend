@@ -50,6 +50,7 @@ router.post("/", auth, checkPostMsgBody, async (req, res) => {
     const conversation = await Conversation.findByIdAndUpdate(conversationId, {
       $push: { messages: newMessage._id },
     });
+    conversation.lastMessage = newMessage._id
     await conversation.save();
     await newMessage.populate({
       path: "responseToMsgId",

@@ -35,6 +35,11 @@ const conversationSchema = Schema({
   }], //Array of usernames
   admin: [{ type: String, require: true }], //Array of username
   messages: [String], // Array of messageId
+  lastMessage: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Messages",
+    default: null,
+  },
   creationDate: {
     type: Date,
     require: true,
