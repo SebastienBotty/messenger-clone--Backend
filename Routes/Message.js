@@ -225,9 +225,7 @@ router.get('/userId/:userId/getOlderMessages', auth, async (req, res) => {
       });
 
     console.log(messages)
-    if (messages.length === 0) {
-      return res.status(400).json({ message: "No older messages" });
-    }
+
     res.status(200).json(messages);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -292,16 +290,16 @@ router.get('/userId/:userId/getNewerMessages', auth, async (req, res) => {
       })
 
     console.log(messages)
-    if (messages.length === 0) {
-      return res.status(400).json({ message: "No newer messages" });
-    }
+
     res.status(200).json(messages);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 });
+
+// NOT USER ANYMORE
 //Get X messages of a conversation starting at a given Y index
-router.get(
+/* router.get(
   "/userId/:userId/getMessages",
   auth,
   checkGetMsgBody,
@@ -358,7 +356,7 @@ router.get(
       res.status(400).json({ message: error.message });
     }
   }
-);
+); */
 
 router.get("/userId/:userId/getLastMsgSeenByUser", auth, async (req, res) => {
   const userId = req.params.userId;
@@ -519,7 +517,7 @@ router.get("/userId/:userId/getMessagesBeforeAndAfter", auth, async (req, res) =
         }
       })
         .sort({ date: -1 })
-        .limit(10)
+        .limit(20)
         .populate({
           path: "responseToMsgId",
           select: "author authorId text date conversationId deletedBy",
@@ -543,7 +541,7 @@ router.get("/userId/:userId/getMessagesBeforeAndAfter", auth, async (req, res) =
         }
       })
         .sort({ date: 1 })
-        .limit(10)
+        .limit(20)
         .populate({
           path: "responseToMsgId",
           select: "author authorId text date conversationId deletedBy",
