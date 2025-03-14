@@ -169,7 +169,7 @@ router.get('/userId/:userId/getOlderMessages', auth, async (req, res) => {
   const userId = req.params.userId
   const conversationId = req.query.conversationId
   const messageId = req.query.messageId
-  const limit = parseInt(req.query.limit) || 20
+  const limit = parseInt(req.query.limit) || 10
 
   if (!userId) return res.status(400).json({ message: "No user Id" })
   if (!conversationId) return res.status(400).json({ message: "No conversation Id" })
@@ -236,7 +236,7 @@ router.get('/userId/:userId/getNewerMessages', auth, async (req, res) => {
   const userId = req.params.userId
   const conversationId = req.query.conversationId
   const messageId = req.query.messageId
-  const limit = parseInt(req.query.limit) || 20
+  const limit = parseInt(req.query.limit) || 10
   console.log("newerMessages")
   if (!userId) return res.status(400).json({ message: "No user Id" })
   if (!conversationId) return res.status(400).json({ message: "No conversation Id" })
