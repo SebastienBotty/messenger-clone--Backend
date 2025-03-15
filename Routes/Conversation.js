@@ -294,7 +294,7 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
     }
 
 
-    let test = []
+    let conversationsArr = []
     if (conversations) {
       for (let conversation of conversations) {
         try {
@@ -306,7 +306,7 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
             lastMsgId = messagesId.messages[messagesId.messages.length - 1];
 
             const lastMessage = await Message.findById(lastMsgId);
-            test.push({ ...conversation.toObject(), lastMessage: lastMessage, photo: "" })
+            conversationsArr.push({ ...conversation.toObject(), lastMessage: lastMessage, photo: "" })
             ////console.log(test)
           }
 
@@ -318,7 +318,7 @@ router.get('/userId/:userId/conversationsWith?', auth, async (req, res) => {
       }
     }
 
-    res.status(200).json(test);
+    res.status(200).json(conversationsArr);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

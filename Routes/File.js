@@ -37,9 +37,10 @@ router.post(
       await Promise.all(
         req.files.map(async (file) => {
           const type = file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/") ? "Medias" : "Files";
+          const decodedFileName = decodeURIComponent(file.originalname);
           const params = {
             Bucket: bucketName,
-            Key: `${convId}/${type}/${timeStamp}-${file.originalname}`,
+            Key: `${convId}/${type}/${timeStamp}-${decodedFileName}`,
             Body: file.buffer,
             ContentType: file.mimetype,
           };
@@ -49,7 +50,7 @@ router.post(
           //console.log(file.originalname)
           const newFile = new File({
             conversationId: convId,
-            pathName: `${convId}/${type}/${timeStamp}-${file.originalname}`,
+            pathName: `${convId}/${type}/${timeStamp}-${decodedFileName}`,
             type: type,
             lastModified: timeStamp,
             size: file.size,
@@ -57,7 +58,7 @@ router.post(
 
           await newFile.save();
 
-          fileNamesArr.push(`${type}/${timeStamp}-${file.originalname}`);
+          fileNamesArr.push(`${type}/${timeStamp}-${decodedFileName}`);
         })
       );
 
@@ -85,11 +86,13 @@ router.post('/profilePic/:userId', auth, upload.single('profilePic'), async (req
   if (!user) return res.status(404).json({ message: "User not found" });
 
   const username = user.userName
+  const decodedFileName = decodeURIComponent(file.originalname);
+
   console.log(username)
 
   const params = {
     Bucket: bucketName,
-    Key: `/users/${userId}/profilePic/${timeStamp}-${file.originalname}`,
+    Key: `/users/${userId}/profilePic/${timeStamp}-${decodedFileName}`,
     Body: file.buffer,
     ContentType: file.mimetype,
   };
@@ -100,7 +103,7 @@ router.post('/profilePic/:userId', auth, upload.single('profilePic'), async (req
     const newProfilePic = new ProfilePic({
       userId: userId,
       username: username,
-      pathName: `/users/${userId}/profilePic/${timeStamp}-${file.originalname}`,
+      pathName: `/users/${userId}/profilePic/${timeStamp}-${decodedFileName}`,
       lastModified: timeStamp,
       size: file.size,
     });
@@ -110,7 +113,7 @@ router.post('/profilePic/:userId', auth, upload.single('profilePic'), async (req
     const user = await User.findOne({ _id: userId });
     if (!user) throw new Error(`User not found: ${userId}`);
 
-    user.photo = `/users/${userId}/profilePic/${timeStamp}-${file.originalname}`;
+    user.photo = `/users/${userId}/profilePic/${timeStamp}-${decodedFileName}`;
     await user.save({ session });
     await session.commitTransaction();
 
@@ -255,7 +258,7 @@ router.get(
         fileNames.map(async (fileName) => {
           const params = {
             Bucket: bucketName,
-            Key: `${convId}/${fileName}`,
+            Key: `${convId}/${decodeURIComponent(fileName)}`,
           };
 
           try {
@@ -274,7 +277,7 @@ router.get(
               url: signedUrl,
             };
           } catch (err) {
-            console.error(`Error fetching file ${fileName} from S3:`, err);
+            console.error(`Error fetching file ${decodeURIComponent(fileName)} from S3:`, err);
             return null; // Return null for files that couldn't be fetched
           }
         })
@@ -294,8 +297,9 @@ router.get(
           });
         }
       });
-
-      res.status(200).json({ files: filteredFilesData });
+      console.log("ICIICICICICICICICICICICICI")
+      console.log(filteredFilesData)
+      res.status(200).json({ files: [...filteredFilesData] });
     } catch (err) {
       console.error("Error fetching files from S3:", err);
       res.status(500).send("Failed to fetch files.");
@@ -430,7 +434,7 @@ router.get("/userId/:userId/conversationId/:conversationId/getConversationImages
 
   const userId = req.params.userId
   const convId = req.params.conversationId;
-  const fileName = req.query.fileName;
+  const fileName = decodeURIComponent(req.query.fileName);
   let removedMemberDate = undefined
 
   //console.log(convId, fileName)
@@ -618,7 +622,10 @@ function isVideo(fileName) {
 
 const copyImageOnS3 = async (imgFilePath, conversationIdTarget, date) => {
   const fileNameWithTimeStamp = imgFilePath.split("/")[2]
-  const fileNameWithoutTimeStamp = fileNameWithTimeStamp.substring(fileNameWithTimeStamp.indexOf('-') + 1)
+  const fileNameWithoutTimeStamp = decodeURIComponent(fileNameWithTimeStamp.substring(fileNameWithTimeStamp.indexOf('-') + 1))
+
+
+
 
   const newTimeStamp = new Date(date).getTime();
   //console.log('999999999999999999999999999999999')
@@ -636,6 +643,8 @@ const copyImageOnS3 = async (imgFilePath, conversationIdTarget, date) => {
     const test = await s3.copyObject(params).promise();
     //(test)
     //console.log("Image copied successfully");
+    console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY")
+    console.log(`${conversationIdTarget}:Medias/${newTimeStamp}-${fileNameWithoutTimeStamp}`)
     return `${conversationIdTarget}:Medias/${newTimeStamp}-${fileNameWithoutTimeStamp}`
   } catch (error) {
     console.error("Error copying image on S3:", error.message);
