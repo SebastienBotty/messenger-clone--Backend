@@ -61,6 +61,65 @@ router.post("/", auth, checkPostMsgBody, async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 });
+
+/* 
+
+STAARTED BUT NOT GONNA DO IT FINALLY
+router.post('/transferMessage',auth,async(req,res)=>{
+  const {username,userId,conversationId,targetConversationId,text} = req.body
+
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .json({ message: "Access denied. You're not who you pretend to be." });
+  }
+  const session = await Conversation.startSession();
+
+  try {
+    session.startTransaction();
+    const conversation = await Conversation.findById(conversationId).session(session)
+    if (!conversation) throw new Error("Conversation not found")
+    if (!conversation.members.some(member=>member.userId===userId) && !conversation.removedMembers.some(member => member.username===username)) throw new Error("You're not member of this conversation")
+
+
+    const targetConversation = await Conversation.findById(targetConversationId).session(session)
+    if (!targetConversation) throw new Error("Conversation target not found")
+      if (!targetConversation.members.some(member=>member.userId===userId) && !targetConversation.removedMembers.some(member => member.username===username)) throw new Error("You're not member of the target conversation")
+    
+        const message = new Message({
+          author: username,
+          authorId: userId,
+          text: [text],
+          seenBy: [{ username: username, userId: authorId, seenDate: new Date() }],
+          date: new Date(date),
+          conversationId: targetConversationId,
+          deletedBy: [],
+          deletedForEveryone: false,
+          reactions: [],
+          responseToMsgId:  null
+        });
+
+        await message.save({session})
+        targetConversation.messages.push(message._id)
+        targetConversation.lastMessage= message._id
+        targetConversation.save({session})
+
+        const conversationObj = conversation.toObject();
+        delete conversationObj.messages;
+        const usersTosend = targetConversation.members.filter(member => member.username !== adderUsername).map(member => member.username) // remove the user who sent the request// !! Read commit message !
+        const socketsIds = await getUsersSocketId(usersTosend);
+        conversationObj.lastMessage = message
+
+    emitAddMembersToUsers(getIo(), socketsIds, conversationObj, addedUsersArr);
+
+        res.status(200).json(message)
+    
+      } catch (error) {
+    
+  }finally{
+
+  }
+}) */
 //-------------------------------GET
 
 //Get all messages of a conversation ADMIN
