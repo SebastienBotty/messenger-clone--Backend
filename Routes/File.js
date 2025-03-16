@@ -54,6 +54,7 @@ router.post(
             type: type,
             lastModified: timeStamp,
             size: file.size,
+            fileName: decodedFileName
           });
 
           await newFile.save();
@@ -375,6 +376,92 @@ router.get('/userId/:userId/conversationId/:conversationId/getRecentFiles', asyn
 
 })
 
+router.get("/userId/:userId/conversationId/:conversationId/getOlderFiles", auth, async (req, res) => {
+  const userId = req.params.userId;
+  const convId = req.params.conversationId;
+  const fileId = decodeURIComponent(req.query.fileId)
+  const fileName = decodeURIComponent(req.query.fileName); // Nom du fichier de référence
+  console.log("OK1")
+  console.log(userId, convId, fileName)
+  let removedMember
+
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .json({ message: "Access denied. You're not who you pretend to be." });
+  }
+
+  if (!convId || !fileName) {
+    return res.status(400).json({ message: "Missing required parameters" });
+  }
+
+  try {
+    const user = await User.findById(userId)
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY")
+    console.log(user)
+    const deletedConversation = user.deletedConversations.find(conv => conv.conversationId === convId);
+
+
+    const conversation = await Conversation.findById(convId)
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    if (!conversation.members.some(member => member.username === user.userName) && !conversation.removedMembers.some(member => member.username === user.userName)) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. You're not a member of this conversation." });
+    }
+
+    if (conversation.removedMembers.some(member => member.username === user.userName)) {
+      removedMember = conversation.removedMembers.find(member => member.username === user.userName)
+    }
+    const referenceFile = await File.findOne({ fileName: fileName, conversationId: convId })
+    if (!referenceFile) {
+      return res.status(404).json({ message: "File not found" })
+    }
+
+    console.log("REFERENCE FILE")
+    console.log(referenceFile)
+    const files = await File.find({
+      conversationId: convId,
+      lastModified: {
+        $gte: new Date(deletedConversation?.deleteDate || 0),
+        ...(removedMember ? { $lte: new Date(removedMember.date) } : {}),
+        $lte: referenceFile.lastModified
+      },
+    }).limit(5);
+    console.log("00000000000000000000000000000")
+    console.log(files)
+
+    const filesWithUrls = await Promise.all(files.map(async (file) => {
+      const signedUrl = s3.getSignedUrl("getObject", {
+        Bucket: bucketName,
+        Key: file.pathName,
+        ResponseContentDisposition: "attachment",
+        Expires: 60 * 60 * 24
+      });
+      return {
+        Key: file.pathName,
+        Url: signedUrl,
+      };
+    }));
+    console.log("11111111111111111111111111111111111111111")
+    console.log(filesWithUrls)
+    return res.status(200).json({ files: filesWithUrls })
+  }
+  catch (error) {
+    return res.status(400).json({ message: error.message })
+  }
+
+});
+
+router.get('/userId/:userId/conversationId/:conversationId/getNewerFiles', async (req, res) => { })
+
+
 /* not used anymore but wanna keep if i want to use it
 const allowedExtensions = ["jpg", "jpeg", "png", "gif", "webp", "svg"];
 
@@ -527,7 +614,12 @@ router.get("/userId/:userId/conversationId/:conversationId/getConversationImages
         Expires: 60 * 60 * 24
 
       });
-      return { fileName: item.Key.split("/")[1], src: signedUrl }
+      console.log("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+      console.log(item.Key)
+      console.log(item.Key.split("/")[2].split("-")[1])
+      console.log("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+
+      return { fileName: item.Key.split("/")[2].split("-")[1], src: signedUrl }
     })
     res.status(200).json(signedUrls)
   } catch (error) {
