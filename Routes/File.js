@@ -12,6 +12,7 @@ const { getUserProfilePicUrl } = require('../Services/User')
 const APIUrl = process.env.API_URL
 const { emitProfilPicUpdate } = require('../Utils/SocketUtils')
 const { getIo } = require('../Config/Socket')
+const { getOlderFiles, getNewerFiles, copyImageOnS3 } = require('../Services/File')
 
 const bucketName = process.env.AWS_BUCKET_NAME;
 
@@ -29,13 +30,14 @@ router.post(
   async (req, res) => {
     const convId = req.params.conversationId;
     const fileNamesArr = [];
-    const timeStamp = Date.now();
     try {
       // Check if folder exists in S3, if not create it
 
       // Upload each file to S3
       await Promise.all(
         req.files.map(async (file) => {
+          const timeStamp = Date.now();
+
           const type = file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/") ? "Medias" : "Files";
           const decodedFileName = decodeURIComponent(file.originalname);
           const params = {
@@ -54,7 +56,7 @@ router.post(
             type: type,
             lastModified: timeStamp,
             size: file.size,
-            fileName: decodedFileName
+            fileName: `${timeStamp}-${decodedFileName}`
           });
 
           await newFile.save();
@@ -257,12 +259,15 @@ router.get(
     try {
       const filesData = await Promise.all(
         fileNames.map(async (fileName) => {
+          const filePath = `${convId}/${decodeURIComponent(fileName)}`
           const params = {
             Bucket: bucketName,
-            Key: `${convId}/${decodeURIComponent(fileName)}`,
+            Key: filePath,
           };
-
           try {
+
+
+
             const data = await s3.headObject(params).promise();
             const mimeType = data.ContentType;
             const signedUrl = s3.getSignedUrl("getObject", {
@@ -272,7 +277,11 @@ router.get(
               Expires: 60 * 60 * 24
 
             });
+
+            const file = await File.findOne({ pathName: filePath })
+
             return {
+              _id: file._id,
               fileName,
               type: mimeType.startsWith("image/") ? "image" : "file",
               url: signedUrl,
@@ -375,15 +384,28 @@ router.get('/userId/:userId/conversationId/:conversationId/getRecentFiles', asyn
 
 
 })
-
-router.get("/userId/:userId/conversationId/:conversationId/getOlderFiles", auth, async (req, res) => {
+router.get("/userId/:userId/conversationId/:conversationId/getMoreImages", auth, async (req, res) => {
   const userId = req.params.userId;
   const convId = req.params.conversationId;
   const fileId = decodeURIComponent(req.query.fileId)
-  const fileName = decodeURIComponent(req.query.fileName); // Nom du fichier de référence
-  console.log("OK1")
-  console.log(userId, convId, fileName)
-  let removedMember
+  const isPreviousFiles = Boolean(req.query.prev)
+
+  const rejectedFilesId = req.query.rejectedFilesIds.includes("-") ? req.query.rejectedFilesIds.split("-") : [req.query.rejectedFilesIds]
+  console.log("XXXXXXXXDDDDDDDDDDDDDD")
+  console.log("XXXXXXXXDDDDDDDDDDDDDD")
+  console.log("XXXXXXXXDDDDDDDDDDDDDD")
+
+  console.log(rejectedFilesId)
+
+
+  console.log("1")
+  if (isPreviousFiles !== true && isPreviousFiles !== false || isPreviousFiles === undefined) {
+    return res.status(400).json({ message: " Prev parameter isn't a boolean" })
+  }
+
+  let removedMemberDate = undefined
+  let convDeleteDate = undefined
+
 
   if (userId !== req.user.userId) {
     return res
@@ -391,7 +413,7 @@ router.get("/userId/:userId/conversationId/:conversationId/getOlderFiles", auth,
       .json({ message: "Access denied. You're not who you pretend to be." });
   }
 
-  if (!convId || !fileName) {
+  if (!convId || !fileId) {
     return res.status(400).json({ message: "Missing required parameters" });
   }
 
@@ -400,14 +422,13 @@ router.get("/userId/:userId/conversationId/:conversationId/getOlderFiles", auth,
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY")
-    console.log(user)
-    const deletedConversation = user.deletedConversations.find(conv => conv.conversationId === convId);
-
 
     const conversation = await Conversation.findById(convId)
     if (!conversation) {
       return res.status(404).json({ message: "Conversation not found" });
+    }
+    if (user.deletedConversations.some(conv => conv.conversationId === convId)) {
+      convDeleteDate = user.deletedConversations.find(conv => conv.conversationId === convId).deleteDate
     }
 
     if (!conversation.members.some(member => member.username === user.userName) && !conversation.removedMembers.some(member => member.username === user.userName)) {
@@ -417,41 +438,45 @@ router.get("/userId/:userId/conversationId/:conversationId/getOlderFiles", auth,
     }
 
     if (conversation.removedMembers.some(member => member.username === user.userName)) {
-      removedMember = conversation.removedMembers.find(member => member.username === user.userName)
-    }
-    const referenceFile = await File.findOne({ fileName: fileName, conversationId: convId })
-    if (!referenceFile) {
-      return res.status(404).json({ message: "File not found" })
+      removedMemberDate = conversation.removedMembers.find(member => member.username === user.userName).date
     }
 
-    console.log("REFERENCE FILE")
-    console.log(referenceFile)
-    const files = await File.find({
-      conversationId: convId,
-      lastModified: {
-        $gte: new Date(deletedConversation?.deleteDate || 0),
-        ...(removedMember ? { $lte: new Date(removedMember.date) } : {}),
-        $lte: referenceFile.lastModified
-      },
-    }).limit(5);
-    console.log("00000000000000000000000000000")
-    console.log(files)
 
-    const filesWithUrls = await Promise.all(files.map(async (file) => {
-      const signedUrl = s3.getSignedUrl("getObject", {
-        Bucket: bucketName,
-        Key: file.pathName,
-        ResponseContentDisposition: "attachment",
-        Expires: 60 * 60 * 24
-      });
-      return {
-        Key: file.pathName,
-        Url: signedUrl,
-      };
-    }));
-    console.log("11111111111111111111111111111111111111111")
-    console.log(filesWithUrls)
-    return res.status(200).json({ files: filesWithUrls })
+    const referenceFile = await File.findById(fileId)
+    if (!referenceFile) throw new Erro("File not found")
+
+
+    const files = isPreviousFiles ?
+      await getOlderFiles(referenceFile._id, referenceFile.lastModified, convId, referenceFile.type, convDeleteDate, removedMemberDate, rejectedFilesId) :
+      await getNewerFiles(referenceFile._id, referenceFile.lastModified, convId, referenceFile.type, convDeleteDate, removedMemberDate, rejectedFilesId)
+
+    const imagesData = await Promise.all(
+      files.map(async (img) => {
+        try {
+          const signedUrl = s3.getSignedUrl("getObject", {
+            Bucket: bucketName,
+            Key: img.pathName,
+            Expires: 60 * 60 * 24,
+          });
+
+          return {
+            _id: img._id,
+            fileName: img.fileName || "unknown",
+            src: signedUrl,
+            lastModified: img.lastModified
+          };
+        } catch (error) {
+          console.error("Error generating signed URL for image:", img.pathName, error);
+          return null;
+        }
+      })
+    );
+
+    const filteredImagesData = imagesData.filter(data => data !== null);
+
+    return res.status(200).json(filteredImagesData)
+
+
   }
   catch (error) {
     return res.status(400).json({ message: error.message })
@@ -460,6 +485,100 @@ router.get("/userId/:userId/conversationId/:conversationId/getOlderFiles", auth,
 });
 
 router.get('/userId/:userId/conversationId/:conversationId/getNewerFiles', async (req, res) => { })
+
+
+//GET all conversation images older and newer than a givven file
+// Gotta improe this route now that i modified a few things but it works and im lazy
+router.get("/userId/:userId/conversationId/:conversationId/getConversationImagesAround", auth, async (req, res) => {
+
+  const userId = req.params.userId
+  const convId = req.params.conversationId;
+  const fileId = req.query.fileId
+
+  let removedMemberDate = undefined
+  let convDeleteDate = undefined
+
+  //console.log(convId, fileName)
+  if (userId !== req.user.userId) {
+    return res
+      .status(403)
+      .json({ message: "Access denied. You're not who you pretend to be." });
+  }
+
+  if (!convId || !fileId) {
+    return res.status(400).json({ message: "Missing required parameters" });
+  }
+
+  try {
+    const user = await User.findById(userId)
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.deletedConversations.some(conv => conv.conversationId === convId)) {
+      convDeleteDate = user.deletedConversations.find(conv => conv.conversationId === convId).deleteDate
+    }
+
+    const conversation = await Conversation.findById(convId).populate("lastMessage");
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    if (!conversation.members.some(member => member.username === user.userName) && !conversation.removedMembers.some(member => member.username === user.userName)) {
+      return res
+        .status(403)
+        .json({ message: "Access denied. You're not in this conversation." });
+    }
+
+    if (conversation.removedMembers.some(member => member.username === user.userName)) {
+      removedMemberDate = conversation.removedMembers.find(member => member.username === user.userName).date
+    }
+    const referenceFile = await File.findById(fileId)
+    if (!referenceFile) throw new Erro("File not found")
+
+
+    const [imagesBefore, imagesAfter] = await Promise.all([
+      getOlderFiles(referenceFile._id, referenceFile.lastModified, convId, referenceFile.type, convDeleteDate, removedMemberDate),
+      getNewerFiles(referenceFile._id, referenceFile.lastModified, convId, referenceFile.type, convDeleteDate, removedMemberDate)
+    ])
+
+    const images = [...imagesBefore, referenceFile, ...imagesAfter]
+
+    const imagesData = await Promise.all(
+      images.sort((a, b) => new Date(a.lastModified).getTime() - new Date(b.lastModified).getTime())
+        .map(async (img) => {
+          try {
+            const signedUrl = s3.getSignedUrl("getObject", {
+              Bucket: bucketName,
+              Key: img.pathName,
+              Expires: 60 * 60 * 24,
+            });
+
+            return {
+              _id: img._id,
+              fileName: img.fileName || "unknown",
+              src: signedUrl,
+              lastModified: img.lastModified
+            };
+          } catch (error) {
+            console.error("Error generating signed URL for image:", img.fileName, error);
+            return null;
+          }
+        })
+    );
+
+    // Filtrer les résultats pour enlever les nulls en cas d'erreur
+    const filteredImagesData = imagesData.filter(data => data !== null);
+
+    return res.status(200).json(filteredImagesData)
+
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+})
+
+
+
 
 
 /* not used anymore but wanna keep if i want to use it
@@ -514,259 +633,5 @@ router.get("/listMediafiles", async (req, res) => {
   }
 });
  */
-//GET all conversation images older ans newer than a given date
-// Gotta improe this route now that i modified a few things but it works and im lazy
-router.get("/userId/:userId/conversationId/:conversationId/getConversationImages", auth, async (req, res) => {
-  console.log("CALLED ICI CALLED ICI CALLED ICICALLED ICICALLED ICICALLED ICICALLED ICICALLED ICI")
-
-  const userId = req.params.userId
-  const convId = req.params.conversationId;
-  const fileName = decodeURIComponent(req.query.fileName);
-  let removedMemberDate = undefined
-
-  //console.log(convId, fileName)
-
-  if (userId !== req.user.userId) {
-    return res
-      .status(403)
-      .json({ message: "Access denied. You're not who you pretend to be." });
-  }
-
-  if (!convId || !fileName) {
-    return res.status(400).json({ message: "Missing required parameters" });
-  }
-
-
-  const user = await User.findById(userId).select("userName");
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
-  }
-  const conversation = await Conversation.findById(convId).populate("lastMessage");
-  if (!conversation) {
-    return res.status(404).json({ message: "Conversation not found" });
-  }
-  if (!conversation.members.some(member => member.username === user.userName) && !conversation.removedMembers.some(member => member.username === user.userName)) {
-    return res
-      .status(403)
-      .json({ message: "Access denied. You're not in this conversation." });
-  }
-
-  if (conversation.removedMembers.some(member => member.username === user.userName)) {
-    removedMemberDate = conversation.removedMembers.find(member => member.username === user.userName).date
-  }
-
-
-  let continuationToken = null;
-  let referenceDate = null;
-  let files = []
-  const referenceKey = `${convId}/${fileName}`;
-  const params = {
-    Bucket: bucketName,
-    ContinuationToken: continuationToken,
-    Prefix: convId + '/Medias/',
-  };
-  try {
-    const userDelConvs = await User.findById(userId).select("deletedConversations");
-    let deletedConv = userDelConvs.deletedConversations.find((conv) => conv.conversationId === convId)
-
-
-
-    do {
-      const data = await s3.listObjectsV2(params).promise();
-      if (referenceDate === null) {
-        const referenceObject = data.Contents.find(obj => obj.Key === referenceKey);
-        if (referenceObject) {
-          //console.log(referenceObject)
-          referenceDate = referenceObject.LastModified;
-        }
-        if (referenceDate) break;
-
-        continuationToken = data.NextContinuationToken;
-      }
-    } while (continuationToken);
-
-    if (!referenceDate) {
-      throw new Error(`Le fichier de référence ${referenceKey} n'a pas été trouvé dans le bucket.`);
-    }
-    continuationToken = null;
-    console.log("666666666666666666666666666666666666666666")
-    const olderFiles = await getOlderFiles(continuationToken, referenceDate, referenceKey, convId, deletedConv?.deleteDate, removedMemberDate);
-    const newerFiles = await getNewerFiles(continuationToken, referenceDate, referenceKey, convId, deletedConv?.deleteDate, removedMemberDate);
-    console.log("7777777777777777777777777777777777777777777777777777777777")
-    //console.log(fileName)
-    files.push({ Key: convId + '/' + fileName })
-    files.unshift(...olderFiles)
-    files.push(...newerFiles)
-
-    const uniqueArr = files.reduce((acc, current) => {
-      // Vérifie si l'id de l'objet courant n'existe pas déjà dans acc
-
-      if (!acc.some(obj => obj.Key === current.Key)) {
-        acc.push(current);
-      }
-      return acc;
-    }, []);
-    const signedUrls = uniqueArr.map(item => {
-      const signedUrl = s3.getSignedUrl("getObject", {
-        Bucket: bucketName,
-        Key: item.Key,
-        ResponseContentDisposition: "attachment", // Indique au navigateur de télécharger le fichier spéc que de l'afficher
-        Expires: 60 * 60 * 24
-
-      });
-      console.log("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
-      console.log(item.Key)
-      console.log(item.Key.split("/")[2].split("-")[1])
-      console.log("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
-
-      return { fileName: item.Key.split("/")[2].split("-")[1], src: signedUrl }
-    })
-    res.status(200).json(signedUrls)
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-})
-
-
-//-------------------------------------------------------------- Functions
-const maxFiles = 5;
-
-const getOlderFiles = async (continuationTkn, referenceDate, referenceKey, convId, convDeleteDate = 0, removedMemberDate = new Date(8640000000000000)) => {
-  console.log("MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM")
-  console.log(convDeleteDate)
-  let continuationToken = continuationTkn;
-  let olderFiles = [];
-
-  const params = {
-    Bucket: bucketName,
-    ContinuationToken: continuationToken,
-    Prefix: convId + '/Medias/',
-  };
-
-  do {
-    const data = await s3.listObjectsV2(params).promise();
-
-
-    olderFiles = olderFiles.concat(
-      data.Contents.filter(obj => isImage(obj.Key) && obj.LastModified <= referenceDate && obj.LastModified < removedMemberDate && obj.LastModified > convDeleteDate && obj.Key !== referenceKey)
-    );
-    olderFiles.sort((a, b) => b.LastModified - a.LastModified);
-
-
-    // On continue jusqu'à trouver au moins 12 fichiers plus vieux ou épuiser tous les fichiers
-    if (olderFiles.length >= maxFiles) {
-      olderFiles = olderFiles.slice(0, maxFiles);
-      break;
-    }
-
-    continuationToken = data.NextContinuationToken;
-  } while (continuationToken);
-  olderFiles.reverse();
-
-  return olderFiles;
-}
-const getNewerFiles = async (continuationTkn, referenceDate, referenceKey, convId, convDeleteDate = 0, removedMemberDate = new Date(8640000000000000)) => {
-  let continuationToken = continuationTkn;
-  let newerFiles = [];
-
-  const params = {
-    Bucket: bucketName,
-    ContinuationToken: continuationToken,
-    Prefix: convId + '/Medias/',
-  };
-  //console.log(referenceKey)
-  do {
-    const data = await s3.listObjectsV2(params).promise();
-
-
-    newerFiles = newerFiles.concat(
-      data.Contents.filter(obj => isImage(obj.Key) && obj.LastModified >= referenceDate && obj.LastModified < removedMemberDate && obj.LastModified > convDeleteDate && obj.Key !== referenceKey)
-    );
-    newerFiles.sort((a, b) => a.LastModified - b.LastModified);
-
-
-    // On continue jusqu'à trouver au moins 12 fichiers plus vieux ou épuiser tous les fichiers
-    if (newerFiles.length >= maxFiles) {
-      newerFiles = newerFiles.slice(0, maxFiles);
-      break;
-    }
-
-    continuationToken = data.NextContinuationToken;
-  } while (continuationToken);
-
-  return newerFiles;
-}
-function isImage(fileName) {
-  const imageExtensions = [
-    '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif',
-    '.svg', '.webp', '.heif', '.heic', '.ico', '.psd',
-    '.ai', '.eps', '.raw', '.cr2', '.nef', '.orf', '.sr2'
-  ];
-  return imageExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
-}
-function isVideo(fileName) {
-  const videoExtensions = [
-    '.mp4', '.mkv', '.mov', '.avi', '.wmv', '.flv', '.webm',
-    '.mpeg', '.mpg', '.3gp', '.m4v', '.f4v', '.hevc'
-  ];
-  return videoExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
-}
-
-const copyImageOnS3 = async (imgFilePath, conversationIdTarget, date) => {
-  const fileNameWithTimeStamp = imgFilePath.split("/")[2]
-  const fileNameWithoutTimeStamp = decodeURIComponent(fileNameWithTimeStamp.substring(fileNameWithTimeStamp.indexOf('-') + 1))
-
-
-
-
-  const newTimeStamp = new Date(date).getTime();
-  //console.log('999999999999999999999999999999999')
-  //console.log(imgFilePath)
-  //console.log(fileNameWithTimeStamp)
-  //console.log(fileNameWithoutTimeStamp)
-  //console.log(`/${bucketName}/${imgFilePath}`)
-  const params = {
-    Bucket: bucketName,
-    CopySource: `/${bucketName}/${imgFilePath}`, // Chemin d'origine
-    Key: `${conversationIdTarget}/Medias/${newTimeStamp}-${fileNameWithoutTimeStamp}`, // Chemin cible
-  };
-
-  try {
-    const test = await s3.copyObject(params).promise();
-    //(test)
-    //console.log("Image copied successfully");
-    console.log("YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY")
-    console.log(`${conversationIdTarget}:Medias/${newTimeStamp}-${fileNameWithoutTimeStamp}`)
-    return `${conversationIdTarget}:Medias/${newTimeStamp}-${fileNameWithoutTimeStamp}`
-  } catch (error) {
-    console.error("Error copying image on S3:", error.message);
-    return false
-  }
-};
-
-// Function to create a folder in S3 if it doesn't already exist
-async function createFolderInS3IfNotExists(bucketName, folderName) {
-  //console.log(bucketName, folderName);
-  try {
-    const paramsMedias = {
-      Bucket: bucketName,
-      Key: `${folderName}/Medias/`, // Note: Using a slash to simulate a folder
-      Body: "",
-    };
-    const paramsFiles = {
-      Bucket: bucketName,
-      Key: `${folderName}/Files/`, // Note: Using a slash to simulate a folder
-      Body: "",
-    };
-
-    await s3.upload(paramsMedias).promise();
-    await s3.upload(paramsFiles).promise();
-
-  } catch (err) {
-    if (err.code !== "EntityAlreadyExists") {
-      throw err;
-    }
-  }
-}
 
 module.exports = router;
