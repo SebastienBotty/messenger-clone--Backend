@@ -370,6 +370,7 @@ router.get('/userId/:userId/conversationId/:conversationId/getRecentFiles', asyn
         Expires: 60 * 60 * 24
       });
       return {
+        _id: file._id,
         Key: file.pathName,
         Url: signedUrl,
         LastModified: file.lastModified,
