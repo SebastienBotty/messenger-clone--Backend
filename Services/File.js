@@ -1,7 +1,7 @@
 
 const File = require("../Models/File")
 //-------------------------------------------------------------- Functions
-const maxFiles = 3;
+const maxFiles = 15;
 
 const getOlderFiles = async (referenceId, referenceDate, convId, fileType, convDeleteDate = new Date(0), removedMemberDate = new Date(8640000000000000), rejectedFilesId = []) => {
     console.log("getOlderFiles called")
@@ -47,6 +47,8 @@ const getNewerFiles = async (referenceId, referenceDate, convId, fileType, convD
         })
             .sort({ lastModified: 1 })
             .limit(maxFiles);
+        console.log("//////////////////////////////////////////////////////////////////////")
+        console.log(newerFiles)
         return newerFiles
     } catch (error) {
         console.error(error.message)

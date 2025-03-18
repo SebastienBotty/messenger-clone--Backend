@@ -388,21 +388,21 @@ router.get("/userId/:userId/conversationId/:conversationId/getMoreImages", auth,
   const userId = req.params.userId;
   const convId = req.params.conversationId;
   const fileId = decodeURIComponent(req.query.fileId)
-  const isPreviousFiles = Boolean(req.query.prev)
 
-  const rejectedFilesId = req.query.rejectedFilesIds.includes("-") ? req.query.rejectedFilesIds.split("-") : [req.query.rejectedFilesIds]
-  console.log("XXXXXXXXDDDDDDDDDDDDDD")
-  console.log("XXXXXXXXDDDDDDDDDDDDDD")
-  console.log("XXXXXXXXDDDDDDDDDDDDDD")
+  let isPreviousFiles;
 
-  console.log(rejectedFilesId)
-
-
-  console.log("1")
-  if (isPreviousFiles !== true && isPreviousFiles !== false || isPreviousFiles === undefined) {
-    return res.status(400).json({ message: " Prev parameter isn't a boolean" })
+  switch (req.query.prev) {
+    case 'true':
+      isPreviousFiles = true;
+      break;
+    case 'false':
+      isPreviousFiles = false;
+      break;
+    default:
+      return res.status(400).json({ message: "Prev parameter isn't a boolean" })
   }
 
+  const rejectedFilesId = req.query.rejectedFilesIds.includes("-") ? req.query.rejectedFilesIds.split("-") : [req.query.rejectedFilesIds]
   let removedMemberDate = undefined
   let convDeleteDate = undefined
 
@@ -445,7 +445,6 @@ router.get("/userId/:userId/conversationId/:conversationId/getMoreImages", auth,
     const referenceFile = await File.findById(fileId)
     if (!referenceFile) throw new Erro("File not found")
 
-
     const files = isPreviousFiles ?
       await getOlderFiles(referenceFile._id, referenceFile.lastModified, convId, referenceFile.type, convDeleteDate, removedMemberDate, rejectedFilesId) :
       await getNewerFiles(referenceFile._id, referenceFile.lastModified, convId, referenceFile.type, convDeleteDate, removedMemberDate, rejectedFilesId)
@@ -471,20 +470,14 @@ router.get("/userId/:userId/conversationId/:conversationId/getMoreImages", auth,
         }
       })
     );
-
     const filteredImagesData = imagesData.filter(data => data !== null);
-
     return res.status(200).json(filteredImagesData)
-
-
   }
   catch (error) {
     return res.status(400).json({ message: error.message })
   }
 
 });
-
-router.get('/userId/:userId/conversationId/:conversationId/getNewerFiles', async (req, res) => { })
 
 
 //GET all conversation images older and newer than a givven file
