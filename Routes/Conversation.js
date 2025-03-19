@@ -8,7 +8,7 @@ const checkPostConvBody = require("../Middlewares/Conversation");
 
 const { getIo } = require('../Config/Socket') // Importer le serveur Socket.IO initialisé
 const { emitConvUpdateToUsers, emitAddMembersToUsers, emitRemoveMemberToUsers, emitChangeConvCustomizationToUsers, emitChangeConvAdminToUsers } = require('../Utils/SocketUtils');
-const { getUsersSocketId, getUserProfilePicUrlByPath, getUserStatus } = require('../Services/User');
+const { getUsersSocketId, getUserProfilePicUrlByPath, getUserStatus, getUserProfilePicUrl } = require('../Services/User');
 
 /* const test = async () => {
   const users = await User.find({})
@@ -139,10 +139,28 @@ router.get("/userId/:userId/getConversations", auth, async (req, res) => {
     for (const convId of convIdsArr) {
       const conversation = await Conversation.findById(convId).select('-messages').populate("lastMessage")
       if (!conversation) continue
-      conversationsArr.push(conversation)
+      conversationsArr.push(conversation.toObject())
     }
 
-    return res.status(200).json(conversationsArr)
+    const convWithPicsUpdates = await Promise.all(
+      conversationsArr.map(async (conv) => {
+        const memberPicsUpdates = await Promise.all(
+          conv.members
+            .map(async (member) => {
+              const profilePicUrl = await getUserProfilePicUrl(member.userId);
+              return { ...member, photo: profilePicUrl };
+            })
+        );
+
+        return {
+          ...conv,
+          members: memberPicsUpdates
+        };
+      })
+    );
+
+
+    return res.status(200).json(convWithPicsUpdates)
   } catch (error) {
     res.status(400).json({ message: error.message })
   }
