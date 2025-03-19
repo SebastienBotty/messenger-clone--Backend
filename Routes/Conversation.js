@@ -812,6 +812,8 @@ router.patch("/changeEmoji", auth, async (req, res) => {
 
     const conversation = await Conversation.findById(conversationId).populate("lastMessage").session(session);
     if (!conversation) throw new Error("Conversation not found");
+    if (!conversation.members.some(member => member.username === username.userName)) throw new Error("Access denied. You're not in this conversation.");
+
 
     conversation.customization.emoji = emoji;
     await conversation.save({ session });
@@ -906,6 +908,70 @@ router.patch("/changeNickname", auth, async (req, res) => {
     session.endSession();
   }
 
+})
+
+router.patch("/changeTheme", auth, async (req, res) => {
+  const { conversationId, theme, userId, date } = req.body;
+  if (!conversationId || !theme || !userId || !date) return res.status(400).json({ message: "All fields are required" });
+
+  if (req.user.userId !== userId) return res.status(403).json({ message: "Access denied." });
+
+
+  const user = await User.findById(userId).select("userName");
+  if (!user) return res.status(404).json({ message: "User not found" });
+
+  const session = await Conversation.startSession();
+  try {
+    session.startTransaction();
+
+    const conversation = await Conversation.findById(conversationId).populate("lastMessage").session(session);
+    if (!conversation) throw new Error("Conversation not found");
+
+    if (!conversation.members.some(member => member.username === user.userName)) {
+      throw new Error("Access denied. You're not in this conversation.");
+    }
+
+    if (conversation.customization.theme === theme) {
+      throw new Error("Conversation already has this theme")
+    }
+
+    conversation.customization.theme = theme;
+    await conversation.save({ session });
+
+    const message = new Message({
+      conversationId: conversationId,
+      author: "System/" + conversationId,
+      text: `${user.userName}-changeTheme-${theme}`,
+      seenBy: [{ username: user.userName, userId: user._id, seenDate: new Date() }],
+      date: new Date(date),
+    })
+
+    const newMessage = await message.save({ session });
+
+    conversation.messages.push(newMessage._id);
+    conversation.lastMessage = newMessage._id
+
+    await conversation.save({ session });
+
+    const conversationObj = conversation.toObject();
+    delete conversationObj.messages;
+
+    const usersTosend = conversation.members.filter(member => member.username !== user.userName).map(member => member.username) // remove the user who sent the request// !! Read commit message !
+    const socketsIds = await getUsersSocketId(usersTosend);
+    conversationObj.lastMessage = newMessage
+    emitChangeConvCustomizationToUsers(getIo(), socketsIds, conversationObj, "theme", theme);
+
+    await session.commitTransaction();
+    res.status(200).json({ conversation: conversationObj, customizationKey: "theme", customizationValue: theme });
+
+  }
+
+  catch (error) {
+    await session.abortTransaction();
+    res.status(400).json({ message: error.message });
+  } finally {
+    session.endSession();
+  }
 })
 
 
