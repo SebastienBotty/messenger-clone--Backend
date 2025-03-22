@@ -9,7 +9,6 @@ const { auth, authAdmin } = require("../Middlewares/authentication");
 const { getIo } = require('../Config/Socket');
 const { getUserProfilePicUrl, updateUserStatus } = require("../Services/User");
 const { notifyUserStatusChange } = require("../Services/Conversation");
-const { emitBlockUser } = require('../Utils/SocketUtils')
 require("dotenv").config();
 
 //-------------------------POST
@@ -372,46 +371,79 @@ router.patch("/userId/:userId/deleteConversation", auth, async (req, res) => {
   }
 })
 
+/* const test = async () => {
+  try {
+    const users = await User.find({})
+
+    for (const user of users) {
+      user.blockedUsers = []
+      delete user.blockedByUsers
+      await user.save()
+      console.log(user.userName + "updated")
+    }
+    console.log("all g")
+  } catch (error) {
+    console.error(error.message)
+  }
+}
+
+test() */
 router.patch('/userId/:userId/blockUser', async (req, res) => {
   const userId = req.params.userId
   const blockedUserId = req.body.blockedUserId
   const isBlocking = req.body.isBlocking
+  const newDate = new Date()
+  const farFutureDate = new Date(8640000000000000);
 
-  console.log(isBlocking)
-
-  const session = await User.startSession();
   try {
-    session.startTransaction()
     const user = await User.findById(userId).session()
     const blockedUser = await User.findById(blockedUserId).session()
     if (!user) throw new Error("User not found")
     if (!blockedUser) throw new Error("Blocked user not found")
 
+    const hasUserAlreadyBeenBlocked = user.blockedUsers.find(user => user.userId === blockedUserId)
     if (isBlocking) {
-      if (!user.blockedUsers.includes(blockedUserId)) user.blockedUsers.push(blockedUserId)
-      if (!user.blockedByUsers.includes(userId)) blockedUser.blockedByUsers.push(userId)
+      if (hasUserAlreadyBeenBlocked) {
+        if (hasUserAlreadyBeenBlocked.dates[hasUserAlreadyBeenBlocked.dates.length - 1].end > newDate) {
+          // That means user target is currently blocked but somehow user had the possibility to block him in frontend
+          // Then nothing happens 
+          console.log("user is already blocked")
+          return res.status(200).json(user.blockedUsers)
+        } else {
+          console.log("blocking user that was once blocked ")
+          hasUserAlreadyBeenBlocked.dates.push({
+            start: newDate,
+            end: farFutureDate
+          })
+        }
+      } else {
+        console.log("blocking new user")
+        user.blockedUsers.push({
+          userId: blockedUserId,
+          dates: [{
+            start: newDate,
+            end: farFutureDate
+          }]
+        })
+      }
 
 
     } else {
-      console.log("unblocking:" + blockedUserId)
-      user.blockedUsers = user.blockedUsers.filter(id => id !== blockedUserId)
-      blockedUser.blockedByUsers = blockedUser.blockedByUsers.filter(id => id !== userId)
-
-      console.log(user.blockedUsers)
+      if (hasUserAlreadyBeenBlocked && hasUserAlreadyBeenBlocked.dates[hasUserAlreadyBeenBlocked.dates.length - 1].end > newDate) {
+        console.log('unblocking user')
+        hasUserAlreadyBeenBlocked.dates[hasUserAlreadyBeenBlocked.dates.length - 1].end = newDate
+      }
+      else {
+        console.log("user was not blocked")
+      }
     }
 
-    await user.save({ session })
-    await blockedUser.save({ session })
-    await session.commitTransaction();
+    await user.save()
 
-    res.status(200).send(true)
-    emitBlockUser(getIo(), blockedUser.socketId, blockedUserId, userId, isBlocking)
+    res.status(200).json(user.blockedUsers)
   } catch (error) {
-    await session.abortTransaction();
 
     res.status(400).json({ message: error.message })
-  } finally {
-    session.endSession();
   }
 })
 

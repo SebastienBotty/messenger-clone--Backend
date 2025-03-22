@@ -162,9 +162,6 @@ const emitChangeConvAdminToUsers = (io, socketIdArr, conversation, targetUsernam
   });
 }
 
-const emitBlockUser = (io, blockedSocket, blockedId, blockerId, isBlocking) => {
-  io.to(blockedSocket).emit("blockUser", { blockerId, blockedId, isBlocking })
-}
 
 module.exports = {
   emitChangeReactionToUsers, emitDeleteReactionToUsers,
@@ -172,5 +169,4 @@ module.exports = {
   emitAdminChangeToUsers, emitNewFileToUsers, emitStatusChangeToUsers,
   emitDeletedMsgToUsers, emitEditedMsgToUsers, emitProfilPicUpdate, emitAddMembersToUsers,
   emitRemoveMemberToUsers, emitChangeConvCustomizationToUsers, emitChangeConvAdminToUsers,
-  emitBlockUser,
 };

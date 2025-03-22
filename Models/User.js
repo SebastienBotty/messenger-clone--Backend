@@ -40,8 +40,24 @@ const userSchema = Schema({
     enum: ["Online", "Offline", "Busy"],
     default: "Online"
   },
-  blockedUsers: [String], // Array of userId
-  blockedByUsers: [String]
+  blockedUsers: [{
+    userId: {
+      type: String,
+      required: true,
+    },
+    dates: [
+      {
+        start: {
+          type: Date,
+          required: true
+        },
+        end: {
+          type: Date,
+          required: true
+        }
+      }
+    ]
+  }]
 });
 
 module.exports = mongoose.model("User", userSchema);
