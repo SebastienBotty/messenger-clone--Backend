@@ -39,7 +39,9 @@ const userSchema = Schema({
     type: String,
     enum: ["Online", "Offline", "Busy"],
     default: "Online"
-  }
+  },
+  blockedUsers: [String], // Array of userId
+  blockedByUsers: [String]
 });
 
 module.exports = mongoose.model("User", userSchema);

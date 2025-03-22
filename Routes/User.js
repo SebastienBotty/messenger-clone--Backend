@@ -9,6 +9,7 @@ const { auth, authAdmin } = require("../Middlewares/authentication");
 const { getIo } = require('../Config/Socket');
 const { getUserProfilePicUrl, updateUserStatus } = require("../Services/User");
 const { notifyUserStatusChange } = require("../Services/Conversation");
+const { emitBlockUser } = require('../Utils/SocketUtils')
 require("dotenv").config();
 
 //-------------------------POST
@@ -368,6 +369,49 @@ router.patch("/userId/:userId/deleteConversation", auth, async (req, res) => {
     res.status(200).json({ message: "Conversation deleted" });
   } catch (error) {
     res.status(400).json({ message: error.message });
+  }
+})
+
+router.patch('/userId/:userId/blockUser', async (req, res) => {
+  const userId = req.params.userId
+  const blockedUserId = req.body.blockedUserId
+  const isBlocking = req.body.isBlocking
+
+  console.log(isBlocking)
+
+  const session = await User.startSession();
+  try {
+    session.startTransaction()
+    const user = await User.findById(userId).session()
+    const blockedUser = await User.findById(blockedUserId).session()
+    if (!user) throw new Error("User not found")
+    if (!blockedUser) throw new Error("Blocked user not found")
+
+    if (isBlocking) {
+      if (!user.blockedUsers.includes(blockedUserId)) user.blockedUsers.push(blockedUserId)
+      if (!user.blockedByUsers.includes(userId)) blockedUser.blockedByUsers.push(userId)
+
+
+    } else {
+      console.log("unblocking:" + blockedUserId)
+      user.blockedUsers = user.blockedUsers.filter(id => id !== blockedUserId)
+      blockedUser.blockedByUsers = blockedUser.blockedByUsers.filter(id => id !== userId)
+
+      console.log(user.blockedUsers)
+    }
+
+    await user.save({ session })
+    await blockedUser.save({ session })
+    await session.commitTransaction();
+
+    res.status(200).send(true)
+    emitBlockUser(getIo(), blockedUser.socketId, blockedUserId, userId, isBlocking)
+  } catch (error) {
+    await session.abortTransaction();
+
+    res.status(400).json({ message: error.message })
+  } finally {
+    session.endSession();
   }
 })
 
