@@ -12,7 +12,7 @@ const { getUserProfilePicUrl } = require('../Services/User')
 const APIUrl = process.env.API_URL
 const { emitProfilPicUpdate } = require('../Utils/SocketUtils')
 const { getIo } = require('../Config/Socket')
-const { getOlderFiles, getNewerFiles, copyImageOnS3 } = require('../Services/File')
+const { getOlderFiles, getNewerFiles, copyImageOnS3, createFolderInS3IfNotExists } = require('../Services/File')
 
 const bucketName = process.env.AWS_BUCKET_NAME;
 

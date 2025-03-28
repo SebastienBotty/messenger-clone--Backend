@@ -1,5 +1,9 @@
 
 const File = require("../Models/File")
+const s3 = require('../Config/S3')
+
+const bucketName = process.env.AWS_BUCKET_NAME
+
 //-------------------------------------------------------------- Functions
 const maxFiles = 15;
 
