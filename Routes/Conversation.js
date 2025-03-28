@@ -148,7 +148,8 @@ router.get("/userId/:userId/getConversations", auth, async (req, res) => {
           conv.members
             .map(async (member) => {
               const profilePicUrl = await getUserProfilePicUrl(member.userId);
-              return { ...member, photo: profilePicUrl };
+              const status = getUserStatus(member.userId)
+              return { ...member, photo: profilePicUrl, ...status };
             })
         );
 
