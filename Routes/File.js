@@ -280,10 +280,12 @@ router.get(
 
             const file = await File.findOne({ pathName: filePath })
 
+            let type = mimeType.startsWith("image/") ? "image" : mimeType.startsWith("video/") ? "video" : "file"
+
             return {
               _id: file._id,
               fileName,
-              type: mimeType.startsWith("image/") ? "image" : "file",
+              type: type,
               url: signedUrl,
             };
           } catch (err) {
@@ -307,8 +309,7 @@ router.get(
           });
         }
       });
-      console.log("ICIICICICICICICICICICICICI")
-      console.log(filteredFilesData)
+
       res.status(200).json({ files: [...filteredFilesData] });
     } catch (err) {
       console.error("Error fetching files from S3:", err);
