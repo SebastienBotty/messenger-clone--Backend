@@ -188,11 +188,11 @@ router.post("/userId/:userId/transferImage", auth, async (req, res) => {
   const fileName = copyPath.split("/Medias/")[1]
 
   const data = await s3.headObject(params).promise();
-  console.log(copyImage)
-  console.log("1111111111111111111111111111111111111")
-  console.log(copyPath)
-  console.log("444444444444444444444444444")
-  console.log(data)
+  /*  console.log(copyImage)
+   console.log("1111111111111111111111111111111111111")
+   console.log(copyPath)
+   console.log("444444444444444444444444444")
+   console.log(data) */
 
   const newFile = new File({
     conversationId: targetConversationId,
@@ -553,8 +553,6 @@ router.get("/userId/:userId/conversationId/:conversationId/getConversationImages
               Key: img.pathName,
               Expires: 60 * 60 * 24,
             });
-            console.log(img)
-            console.log("ERTRZEFZERTRZEFZERTRZEFZERTRZEFZERTRZEFZERTRZEFZERTRZEFZERTRZEFZERTRZEFZERTRZEFZERTRZEFZERTRZEFZERTRZEFZERTRZEFZ")
             return {
               _id: img._id,
               fileName: img.fileName || "unknown",
@@ -570,7 +568,7 @@ router.get("/userId/:userId/conversationId/:conversationId/getConversationImages
 
     // Filtrer les résultats pour enlever les nulls en cas d'erreur
     const filteredImagesData = imagesData.filter(data => data !== null);
-    console.log(filteredImagesData)
+    // console.log(filteredImagesData)
     return res.status(200).json(filteredImagesData)
 
   } catch (error) {

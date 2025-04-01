@@ -757,7 +757,7 @@ router.patch("/changeConversationPhoto", auth, async (req, res) => {
 // PATCH conversationName - Change conversation name
 router.patch("/changeConversationName", auth, async (req, res) => {
   const { conversationId, conversationName, userId, date } = req.body;
-  if (!conversationId || !conversationName || !userId || !date) {
+  if (!conversationId || !userId || !date) {
     return res.status(400).json({ message: "All fields are required" });
   }
   if (req.user.userId !== userId) {
