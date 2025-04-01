@@ -18,7 +18,7 @@ const FileSchema = new Schema({
 
 
 // Middleware post-save : défini dans le fichier du modèle
-/* FileSchema.post("save", async function (doc) {
+FileSchema.post("save", async function (doc) {
     console.log("File saved: " + doc.pathName);
     const convUsers = await getConvUsers(doc.conversationId);
     const socketIds = await getUsersSocketId(convUsers)
@@ -39,7 +39,7 @@ const FileSchema = new Schema({
 
     emitNewFileToUsers(getIo(), socketIds, data, doc.conversationId)
 
-}); */
+});
 
 
 module.exports = mongoose.model("File", FileSchema);
