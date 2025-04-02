@@ -491,10 +491,29 @@ router.get("/userId/:userId/searchMessages", auth, async (req, res) => {
     const messages = await Message.find({
       conversationId: convId,
       $expr: {
-        $regexMatch: {
-          input: { $arrayElemAt: ["$text", -1] },
-          regex: new RegExp(word, "i")
-        }
+        $and: [
+          {
+            $regexMatch: {
+              input: { $arrayElemAt: ["$text", -1] },
+              regex: new RegExp(word, "i")
+            }
+          },
+          {
+            $not: {
+              $regexMatch: {
+                input: { $arrayElemAt: ["$text", -1] },
+                regex: new RegExp(`^PATHIMAGE/${convId}:`, "i") // Vérifie que le dernier élément ne commence pas par la chaîne contenue dans baguette
+              }
+            }
+          }, {
+            $not: {
+              $regexMatch: {
+                input: { $arrayElemAt: ["$text", -1] },
+                regex: new RegExp(`^GIF/${convId}:`, "i") // Vérifie que le dernier élément ne commence pas par la chaîne contenue dans baguette
+              }
+            }
+          }
+        ]
       },
       author: { $ne: "System/" + convId },
       date: {
