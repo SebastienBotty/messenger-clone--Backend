@@ -63,7 +63,6 @@ app.get('/pingTest', (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Example app listening at http://localhost:3000`)
-  setInterval(pingTou, 4 * 60 * 1000)
 }
 );
 
