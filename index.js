@@ -15,6 +15,7 @@ const conversationRouter = require("./Routes/Conversation");
 const userRouter = require("./Routes/User");
 const messageRouter = require("./Routes/Message");
 const fileRouter = require("./Routes/File");
+const { pingTou } = require("./InterBackend");
 
 initSocket(server);
 
@@ -22,7 +23,7 @@ initSocket(server);
 app.use(express.json({ limit: "50mb" }));
 app.use(
   cors({
-    origin: "http://localhost:3001", // Remplacez cela par l'URL de votre frontend
+    origin: [process.env.TOU_URL, process.env.FRONTEND_URL,],
   })
 );
 
@@ -55,9 +56,14 @@ db.once("open", function () {
 });
 
 app.get("/", (req, res) => res.send("Hello World!"));
+app.get('/pingTest', (req, res) => {
+  console.log("ping received ")
+})
 
-server.listen(PORT, () =>
+server.listen(PORT, () => {
   console.log(`Example app listening at http://localhost:3000`)
+  setInterval(pingTou, 4 * 60 * 1000)
+}
 );
 
 // Exporter la connexion pour l'utiliser dans d'autres parties de l'application si nécessaire
