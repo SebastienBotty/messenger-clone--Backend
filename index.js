@@ -58,6 +58,7 @@ db.once("open", function () {
 app.get("/", (req, res) => res.send("Hello World!"));
 app.get('/pingTest', (req, res) => {
   console.log("ping received ")
+  res.send(true)
 })
 
 server.listen(PORT, () => {
