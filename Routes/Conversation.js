@@ -833,7 +833,7 @@ router.patch("/changeEmoji", auth, async (req, res) => {
 
     const conversation = await Conversation.findById(conversationId).populate("lastMessage").session(session);
     if (!conversation) throw new Error("Conversation not found");
-    if (!conversation.members.some(member => member.username === username.userName)) throw new Error("Access denied. You're not in this conversation.");
+    if (!conversation.members.some(member => member.username === user.userName)) throw new Error("Access denied. You're not in this conversation.");
 
 
     conversation.customization.emoji = emoji;
