@@ -264,7 +264,9 @@ router.get("/userId/:userId/privateConversation?", auth, async (req, res) => {
           //console.log("CONVEERSATOIN EXISTANTE")
           const conversationObj = conversation.toObject();
           for (const member of conversationObj.members) {
-            member.photo = member.photo ? await getUserProfilePicUrlByPath(member.photo) : ""
+            const userPhoto = await User.findOne({ userName: member.username }).select("photo")
+            const url = await getUserProfilePicUrlByPath(userPhoto.photo)
+            member.photo = userPhoto.photo ? url : ""
           }
           return res.json(conversationObj);
         }
