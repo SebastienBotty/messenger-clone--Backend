@@ -10,24 +10,7 @@ const { getIo } = require('../Config/Socket') // Importer le serveur Socket.IO i
 const { emitConvUpdateToUsers, emitAddMembersToUsers, emitRemoveMemberToUsers, emitChangeConvCustomizationToUsers, emitChangeConvAdminToUsers } = require('../Utils/SocketUtils');
 const { getUsersSocketId, getUserProfilePicUrlByPath, getUserStatus, getUserProfilePicUrl } = require('../Services/User');
 
-/* const test = async () => {
-  const users = await User.find({})
-  try {
-    for (const user of users) {
-      user.conversations = []
-      user.mutedConversations = []
-      user.deletedConversations = []
-      await user.save()
-      console.log("user " + user.userName + " correctly update conversations: " + user.conversations)
-    }
-    console.log("Travail terminé")
-  } catch (error) {
-    console.error(error.message)
-  }
 
-}
-
-test() */
 
 //----------------------POST---------------------------
 router.post("/", auth, checkPostConvBody, async (req, res) => {
@@ -144,6 +127,7 @@ router.get("/userId/:userId/getConversations", auth, async (req, res) => {
 
     const convWithPicsUpdates = await Promise.all(
       conversationsArr.map(async (conv) => {
+        // Mise à jour des membres actifs
         const memberPicsUpdates = await Promise.all(
           conv.members
             .map(async (member) => {
@@ -153,9 +137,19 @@ router.get("/userId/:userId/getConversations", auth, async (req, res) => {
             })
         );
 
+        // Mise à jour des membres supprimés
+        const removedMembersPicsUpdates = await Promise.all(
+          (conv.removedMembers || []).map(async (member) => {
+            const user = await User.findOne({ userName: member.username }).select('_id photo');
+            const profilePicUrl = user?.photo ? await getUserProfilePicUrlByPath(user.photo) : '';
+            return { ...member, photo: profilePicUrl };
+          })
+        );
+
         return {
           ...conv,
-          members: memberPicsUpdates
+          members: memberPicsUpdates,
+          removedMembers: removedMembersPicsUpdates
         };
       })
     );
@@ -263,11 +257,29 @@ router.get("/userId/:userId/privateConversation?", auth, async (req, res) => {
         ) {
           //console.log("CONVEERSATOIN EXISTANTE")
           const conversationObj = conversation.toObject();
-          for (const member of conversationObj.members) {
-            const userPhoto = await User.findOne({ userName: member.username }).select("photo")
-            const url = await getUserProfilePicUrlByPath(userPhoto.photo)
-            member.photo = userPhoto.photo ? url : ""
-          }
+
+          // Mise à jour des membres actifs
+          const memberPicsUpdates = await Promise.all(
+            conversationObj.members
+              .map(async (member) => {
+                const profilePicUrl = await getUserProfilePicUrl(member.userId);
+                const status = getUserStatus(member.userId)
+                return { ...member, photo: profilePicUrl, ...status };
+              })
+          );
+
+          // Mise à jour des membres supprimés
+          const removedMembersPicsUpdates = await Promise.all(
+            (conversationObj.removedMembers || []).map(async (member) => {
+              const user = await User.findOne({ userName: member.username }).select('_id photo');
+              const profilePicUrl = user?.photo ? await getUserProfilePicUrlByPath(user.photo) : '';
+              return { ...member, photo: profilePicUrl };
+            })
+          );
+
+          conversationObj.members = memberPicsUpdates;
+          conversationObj.removedMembers = removedMembersPicsUpdates;
+
           return res.json(conversationObj);
         }
       }
@@ -459,13 +471,14 @@ router.patch("/addMembers", auth, async (req, res) => {
 
 //PATCH CONV MEMBERS -  Remove a user from a group conversation
 router.patch("/removeUser", auth, async (req, res) => {
-  const { conversationId, removerUsername, removerUserId, removedUsername, date } = req.body;
-
-  if (!conversationId || !removerUsername || !removerUserId || !removedUsername || !date) {
+  const { conversationId, removerUsername, removerUserId, targetUsername, targetUserId, targetPhoto, date } = req.body;
+  console.log({ conversationId, removerUsername, removerUserId, targetUsername, targetUserId, date })
+  if (!conversationId || !removerUsername || !removerUserId || !targetUsername || !targetUserId || targetPhoto === undefined || targetPhoto === null || !date) {
     return res.status(400).json({ message: "All fields are required" });
   }
   if (req.user.userId !== removerUserId) {
     return res.status(403).json({ message: "Access denied." });
+
   }
 
   const session = await Conversation.startSession();
@@ -481,25 +494,25 @@ router.patch("/removeUser", auth, async (req, res) => {
     if (!conversation.admin.includes(removerUsername)) {
       throw new Error("You are not the admin of this conversation");
     }
-    if (conversation.admin.includes(removedUsername)) {
+    if (conversation.admin.includes(targetUsername)) {
       throw new Error("You can't remove an admin of the conversation");
     }
-    if (!conversation.members.some(member => member.username === removedUsername)) {
+    if (!conversation.members.some(member => member.username === targetUsername)) {
       throw new Error("User is not in the conversation");
     }
     if (!conversation.isGroupConversation) {
       throw new Error("You can't remove a user from a private conversation");
     }
 
-    conversation.members = conversation.members.filter(member => member.username !== removedUsername);
-    conversation.removedMembers.push({ username: removedUsername, date: new Date(date) });
+    conversation.members = conversation.members.filter(member => member.username !== targetUsername);
+    conversation.removedMembers.push({ username: targetUsername, date: new Date(date), userId: targetUserId });
     await conversation.save({ session });
 
 
     const message = new Message({
       conversationId: conversationId,
       author: "System/" + conversationId,
-      text: `${removerUsername}-removeUser-${removedUsername}`,
+      text: `${removerUsername}-removeUser-${targetUsername}`,
       seenBy: [{ username: removerUsername, userId: removerUserId, seenDate: new Date() }],
       date: new Date(date),
     })
@@ -511,12 +524,12 @@ router.patch("/removeUser", auth, async (req, res) => {
     const conversationObj = conversation.toObject();
     delete conversationObj.messages;
 
-    const usersTosend = [...conversation.members.filter(member => member.username !== removerUsername).map(member => member.username), removedUsername] // remove the user who sent the request// !! Read commit message !
+    const usersTosend = [...conversation.members.filter(member => member.username !== removerUsername).map(member => member.username), targetUsername] // remove the user who sent the request// !! Read commit message !
     const socketsIds = await getUsersSocketId(usersTosend);
     conversationObj.lastMessage = newMessage
-    emitRemoveMemberToUsers(getIo(), socketsIds, conversationObj, removedUsername);
+    emitRemoveMemberToUsers(getIo(), socketsIds, conversationObj, targetUsername, targetUserId, targetPhoto);
     await session.commitTransaction();
-    res.status(200).json({ conversation: conversationObj, removedUsername });
+    res.status(200).json({ conversation: conversationObj, targetUsername, targetUserId, targetPhoto });
 
   } catch (error) {
     await session.abortTransaction();
@@ -562,7 +575,7 @@ router.patch("/leaveConversation", auth, async (req, res) => {
       throw new Error("User is not in the conversation");
     }
     conversation.members = conversation.members.filter(member => member.username !== username);
-    conversation.removedMembers.push({ username: username, date: new Date(date) });
+    conversation.removedMembers.push({ username: username, date: new Date(date), userId: userId });
     await conversation.save({ session });
 
     const message = new Message({

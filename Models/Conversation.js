@@ -49,6 +49,10 @@ const conversationSchema = Schema({
       type: String,
       require: true
     },
+    userId: {
+      type: String,
+      require: true
+    },
     date: {
       type: Date,
       require: true

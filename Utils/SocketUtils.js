@@ -140,10 +140,10 @@ const emitAddMembersToUsers = (io, socketIdArr, conversation, addedUsersArr) => 
   });
 }
 
-const emitRemoveMemberToUsers = (io, socketIdArr, conversation, removedUsername) => {
+const emitRemoveMemberToUsers = (io, socketIdArr, conversation, targetUsername, targetUserId, targetPhoto) => {
   socketIdArr.map((socketId) => {
     if (socketId.socketId) {
-      io.to(socketId.socketId).emit("removeMember", { conversation, removedUsername })
+      io.to(socketId.socketId).emit("removeMember", { conversation, targetUsername, targetUserId, targetPhoto })
     }
   });
 }
