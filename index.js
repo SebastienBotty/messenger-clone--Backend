@@ -23,7 +23,7 @@ initSocket(server);
 app.use(express.json({ limit: "50mb" }));
 app.use(
   cors({
-    origin: [process.env.TOU_URL, process.env.FRONTEND_URL, process.env.PORTFOLIO_URL, process.env.PORTFOLIO_URL2],
+    origin: [process.env.FRONTEND_URL, process.env.PORTFOLIO_URL, process.env.PORTFOLIO_URL2],
   })
 );
 
