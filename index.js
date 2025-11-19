@@ -19,11 +19,14 @@ const { pingTou } = require("./InterBackend");
 
 initSocket(server);
 
+app.set("trust proxy", 1);    // ← obligatoire avec Render
 
 app.use(express.json({ limit: "50mb" }));
 app.use(
   cors({
     origin: [process.env.FRONTEND_URL, process.env.PORTFOLIO_URL, process.env.PORTFOLIO_URL2],
+    credentials: true,          // ← ESSENTIEL
+
   })
 );
 
